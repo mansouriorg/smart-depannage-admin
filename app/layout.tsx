@@ -11,7 +11,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Smart Admin | Espace Supervision",
+  title: "Smart Depannage | Espace Supervision",
   description: "Plateforme de gestion des interventions techniques.",
   icons: {
     icon: "/favicon.ico", // Si vous en avez un

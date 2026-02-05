@@ -32,7 +32,7 @@ export function Sidebar() {
         <div className="bg-gradient-to-br from-[#D4AF37] to-[#B69121] p-1.5 rounded-lg text-white shadow-lg shadow-[#D4AF37]/20 ring-1 ring-[#D4AF37]/50">
            <ShieldCheck className="h-5 w-5" />
         </div>
-        <span className="font-bold text-stone-200 tracking-tight text-lg">Smart Admin</span>
+        <span className="font-bold text-stone-200 tracking-tight text-lg">Smart Depannage</span>
       </div>
 
       {/* --- NAVIGATION --- */}
