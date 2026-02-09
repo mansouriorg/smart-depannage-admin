@@ -4,21 +4,21 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, Lock, Mail, Loader2, ArrowRight, AlertCircle } from "lucide-react";
-import api from "@/lib/api"; // ✅ Import your API helper
+import api from "@/lib/api"; 
 
 export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   
-  // ✅ State for inputs
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  // ✅ Pre-filled for Development
+  const [email, setEmail] = useState("admin@smart-depannage.com");
+  const [password, setPassword] = useState("password123");
   const [error, setError] = useState("");
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setIsLoading(true);
-    setError(""); // Reset previous errors
+    setError(""); 
 
     try {
       // 1. 🚀 Call NestJS Login Endpoint
@@ -34,12 +34,10 @@ export default function LoginPage() {
       // 3. 💾 Save Token & Redirect
       localStorage.setItem("adminToken", res.data.accessToken);
       
-      // Optional: Add a small delay for the user to see the success state
       router.push("/dashboard"); 
       
     } catch (err: any) {
       console.error("Login failed:", err);
-      // Handle Errors
       if (err.response?.status === 401) {
         setError("Identifiants incorrects. Veuillez réessayer.");
       } else {
@@ -53,12 +51,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#0f111a] relative overflow-hidden font-sans selection:bg-[#D4AF37]/30">
       
       {/* --- FOND ANIMÉ --- */}
-      {/* Glow Or (Haut Gauche) */}
       <div className="absolute top-0 left-0 w-[800px] h-[800px] bg-[#D4AF37]/5 rounded-full blur-[120px] pointer-events-none" />
-      {/* Glow Bleu (Bas Droite) */}
       <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-blue-900/10 rounded-full blur-[100px] pointer-events-none" />
-      
-      {/* Grille subtile */}
       <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
 
       {/* --- CARTE DE CONNEXION --- */}
@@ -127,7 +121,7 @@ export default function LoginPage() {
             </div>
             )}
 
-          {/* Bouton de connexion (OR) */}
+          {/* Bouton de connexion */}
           <button 
             type="submit" 
             disabled={isLoading}
