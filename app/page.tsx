@@ -3,21 +3,50 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, Lock, Mail, Loader2, ArrowRight } from "lucide-react";
+import { ShieldCheck, Lock, Mail, Loader2, ArrowRight, AlertCircle } from "lucide-react";
+import api from "@/lib/api"; // ✅ Import your API helper
 
 export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  
+  // ✅ State for inputs
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setIsLoading(true);
+    setError(""); // Reset previous errors
 
-    // Simulation de vérification (2 secondes)
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      // 1. 🚀 Call NestJS Login Endpoint
+      const res = await api.post("/auth/login", { email, password });
 
-    // Redirection vers le dashboard
-    router.push("/dashboard");
+      // 2. 🛡️ Security Check: Ensure user is ADMIN
+      if (res.data.user.role !== 'ADMIN') {
+        setError("Accès refusé. Ce compte n'a pas les droits d'administration.");
+        setIsLoading(false);
+        return;
+      }
+
+      // 3. 💾 Save Token & Redirect
+      localStorage.setItem("adminToken", res.data.accessToken);
+      
+      // Optional: Add a small delay for the user to see the success state
+      router.push("/dashboard"); 
+      
+    } catch (err: any) {
+      console.error("Login failed:", err);
+      // Handle Errors
+      if (err.response?.status === 401) {
+        setError("Identifiants incorrects. Veuillez réessayer.");
+      } else {
+        setError("Impossible de se connecter au serveur. Vérifiez votre connexion.");
+      }
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -61,6 +90,8 @@ export default function LoginPage() {
               <input 
                 type="email" 
                 placeholder="admin@smart-depannage.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-[#0a0c12] border border-stone-800 text-stone-200 rounded-xl px-10 py-3.5 outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all placeholder:text-stone-600"
                 required
               />
@@ -80,17 +111,27 @@ export default function LoginPage() {
               <input 
                 type="password" 
                 placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-[#0a0c12] border border-stone-800 text-stone-200 rounded-xl px-10 py-3.5 outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all placeholder:text-stone-600"
                 required
               />
             </div>
           </div>
 
+            {/* 🔴 MESSAGE D'ERREUR */}
+            {error && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex items-start gap-3 text-red-400 text-sm animate-in fade-in slide-in-from-top-2">
+                <AlertCircle className="h-5 w-5 shrink-0" />
+                <span>{error}</span>
+            </div>
+            )}
+
           {/* Bouton de connexion (OR) */}
           <button 
             type="submit" 
             disabled={isLoading}
-            className="w-full bg-gradient-to-r from-[#D4AF37] via-[#E5C04A] to-[#B69121] hover:brightness-110 text-white font-bold py-4 rounded-xl shadow-lg shadow-[#D4AF37]/20 border-t border-[#FFF5D1]/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 group"
+            className="w-full bg-gradient-to-r from-[#D4AF37] via-[#E5C04A] to-[#B69121] hover:brightness-110 text-white font-bold py-4 rounded-xl shadow-lg shadow-[#D4AF37]/20 border-t border-[#FFF5D1]/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 group disabled:opacity-70 disabled:cursor-not-allowed"
           >
             {isLoading ? (
               <>
