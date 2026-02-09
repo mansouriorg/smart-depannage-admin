@@ -1,49 +1,73 @@
-// src/components/tickets/ticket-status-badge.tsx
 import { 
   AlertCircle, 
   CheckCircle2, 
   Clock, 
-  User 
+  User, 
+  XCircle, 
+  HelpCircle 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { type TicketStatus } from "@/lib/mock-data";
 
 interface TicketStatusBadgeProps {
-  status: TicketStatus;
+  status: string;
 }
 
 export function TicketStatusBadge({ status }: TicketStatusBadgeProps) {
   
-  // Configuration des styles et icônes pour chaque statut
-  const config = {
-    EN_ATTENTE: {
+  // 1. Configuration: Maps Backend ENUM (keys) -> Frontend UI (values)
+  // Keys must match exactly what is in your Database (PENDING, COMPLETED...)
+  const config: Record<string, { label: string; icon: any; className: string }> = {
+    
+    // Status: En Attente (PENDING)
+    PENDING: {
       label: "En attente",
       icon: AlertCircle,
-      // STYLE OR (Urgent / Action requise)
-      // Fond Or très léger, Texte Or foncé, Bordure Or
+      // STYLE OR
       className: "bg-[#D4AF37]/10 text-[#B69121] border-[#D4AF37]/20 ring-[#D4AF37]/10",
     },
-    AFFECTE: {
+    
+    // Status: Accepté (ACCEPTED) - Souvent utilisé pour "Affecté"
+    ACCEPTED: {
       label: "Affecté",
       icon: User,
-      // STYLE BLEU (Information)
+      // STYLE BLEU
       className: "bg-blue-50 text-blue-700 border-blue-200 ring-blue-500/10",
     },
-    EN_COURS: {
+    
+    // Status: En Cours (IN_PROGRESS)
+    IN_PROGRESS: {
       label: "En cours",
       icon: Clock,
-      // STYLE VIOLET (Activité en cours)
+      // STYLE VIOLET
       className: "bg-indigo-50 text-indigo-700 border-indigo-200 ring-indigo-500/10",
     },
-    TERMINE: {
+    
+    // Status: Terminé (COMPLETED)
+    COMPLETED: {
       label: "Terminé",
       icon: CheckCircle2,
-      // STYLE VERT (Succès)
+      // STYLE VERT
       className: "bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-500/10",
+    },
+
+    // Status: Annulé (CANCELLED)
+    CANCELLED: {
+      label: "Annulé",
+      icon: XCircle,
+      // STYLE ROUGE
+      className: "bg-red-50 text-red-700 border-red-200 ring-red-500/10",
     },
   };
 
-  const { label, icon: Icon, className } = config[status];
+  // 2. 🛡️ SAFE GUARD: Fallback if status is unknown/undefined
+  // This prevents the "Cannot destructure property label of undefined" error.
+  const statusConfig = config[status] || {
+    label: status || "Inconnu",
+    icon: HelpCircle,
+    className: "bg-gray-100 text-gray-600 border-gray-200",
+  };
+
+  const { label, icon: Icon, className } = statusConfig;
 
   return (
     <span 
