@@ -1,4 +1,3 @@
-// src/components/layout/sidebar.tsx
 "use client";
 
 import Link from "next/link";
@@ -9,16 +8,38 @@ import {
   Users, 
   Settings, 
   ShieldCheck, 
-  LogOut 
+  LogOut,
+  FileText // ✅ Icon for Applications
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Définition des liens du menu
 const sidebarItems = [
-  { icon: LayoutDashboard, label: "Vue d'ensemble", href: "/dashboard" },
-  { icon: Ticket, label: "Interventions", href: "/dashboard/tickets" },
-  { icon: Users, label: "Techniciens", href: "/dashboard/technicians" }, // Placeholder
-  { icon: Settings, label: "Paramètres", href: "/dashboard/settings" }, // Placeholder
+  { 
+    icon: LayoutDashboard, 
+    label: "Vue d'ensemble", 
+    href: "/dashboard" 
+  },
+  { 
+    icon: Ticket, 
+    label: "Interventions", 
+    href: "/dashboard/tickets" 
+  },
+  // ✅ NEW: Applications Page
+  { 
+    icon: FileText, 
+    label: "Candidatures", 
+    href: "/dashboard/applications" 
+  },
+  { 
+    icon: Users, 
+    label: "Techniciens", 
+    href: "/dashboard/technicians" 
+  },
+  { 
+    icon: Settings, 
+    label: "Paramètres", 
+    href: "/dashboard/settings" 
+  },
 ];
 
 export function Sidebar() {
