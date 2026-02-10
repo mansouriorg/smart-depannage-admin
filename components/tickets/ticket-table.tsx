@@ -3,13 +3,12 @@
 import { 
   MapPin, 
   Calendar, 
-  User 
+  User,
+  Phone // ✅ Added Phone Icon
 } from "lucide-react";
 import { TicketStatusBadge } from "./ticket-status-badge";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-
-// ✅ Import the new Actions component
 import { TicketActions } from "./ticket-actions"; 
 
 // Definition of an Artisan
@@ -28,7 +27,7 @@ interface Ticket {
   createdAt: string;
   client?: {
     name: string;
-    phone?: string;
+    phone?: string; // ✅ We will use this
   };
   artisanId?: number; // Needed to show current selection
   artisan?: {
@@ -75,7 +74,7 @@ export function TicketTable({ data, artisans }: TicketTableProps) {
                   className="group hover:bg-[#D4AF37]/5 transition-colors duration-200"
                 >
                   
-                  {/* 1. Client Info */}
+                  {/* 1. Client Info (UPDATED WITH PHONE) */}
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       {/* Avatar */}
@@ -86,8 +85,11 @@ export function TicketTable({ data, artisans }: TicketTableProps) {
                         <div className="font-bold text-blue-950 group-hover:text-[#B69121] transition-colors">
                           {ticket.client?.name || "Client Invité"}
                         </div>
-                        <div className="text-stone-400 text-xs font-medium">
-                          {ticket.client?.phone || "Non renseigné"}
+                        
+                        {/* ✅ DISPLAY PHONE NUMBER HERE */}
+                        <div className="text-stone-400 text-xs font-medium flex items-center gap-1.5 mt-0.5">
+                          <Phone className="h-3 w-3 text-[#D4AF37]" />
+                          <span>{ticket.client?.phone || "Non renseigné"}</span>
                         </div>
                       </div>
                     </div>

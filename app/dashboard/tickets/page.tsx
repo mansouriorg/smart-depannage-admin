@@ -1,15 +1,20 @@
 "use client"; // ✅ Required for useEffect and useState
 
 import { useEffect, useState } from "react";
-import { Filter, Loader2, RefreshCcw, Plus } from "lucide-react";
+import { Filter, Loader2, RefreshCcw } from "lucide-react";
 import api from "@/lib/api"; // ✅ Use your configured Axios helper
 import { TicketTable } from "@/components/tickets/ticket-table";
+// ✅ IMPORT THE NEW MODAL
+import { CreateTicketModal } from "@/components/tickets/create-ticket-modal";
 
 export default function TicketsPage() {
   const [tickets, setTickets] = useState([]);
   const [artisans, setArtisans] = useState([]); // ✅ State for Artisans
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // ✅ 1. ÉTAT POUR LE FILTRE (Par défaut sur "ALL")
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
   // 1. Fetch data from the server on load
   useEffect(() => {
@@ -23,7 +28,7 @@ export default function TicketsPage() {
       // 🚀 Parallel Fetch: Get Tickets AND Artisans at the same time
       const [ticketsRes, artisansRes] = await Promise.all([
         api.get("/interventions"),
-        api.get("/users/artisans") // ✅ Fetch the list of technicians
+        api.get("/users/artisans") 
       ]);
 
       setTickets(ticketsRes.data);
@@ -36,6 +41,12 @@ export default function TicketsPage() {
     }
   };
 
+  // ✅ 2. LOGIQUE DE FILTRAGE
+  const filteredTickets = tickets.filter((ticket: any) => {
+    if (statusFilter === "ALL") return true;
+    return ticket.status === statusFilter;
+  });
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       
@@ -46,29 +57,44 @@ export default function TicketsPage() {
             Interventions
           </h1>
           <p className="text-stone-500 mt-1">
-            Gérez les demandes entrantes et assignez vos experts.
+            {/* Petit détail UX : on affiche le compteur filtré */}
+            Affichage de {filteredTickets.length} sur {tickets.length} interventions.
           </p>
         </div>
         
         <div className="flex gap-3">
-           {/* Refresh Button */}
+           
+           {/* Bouton Rafraîchir */}
            <button 
             onClick={loadData}
             disabled={isLoading}
-            className="flex items-center gap-2 bg-white border border-stone-200 px-4 py-2.5 rounded-lg text-sm font-medium hover:border-[#D4AF37]/50 hover:text-[#B69121] transition-colors shadow-sm text-stone-600 disabled:opacity-50"
+            className="flex items-center gap-2 bg-white border border-stone-200 px-3 py-2.5 rounded-lg text-sm font-medium hover:border-[#D4AF37]/50 hover:text-[#B69121] transition-colors shadow-sm text-stone-600 disabled:opacity-50"
+            title="Rafraîchir les données"
           >
             <RefreshCcw className={isLoading ? "h-4 w-4 animate-spin" : "h-4 w-4"} /> 
           </button>
 
-           <button className="flex items-center gap-2 bg-white border border-stone-200 px-4 py-2.5 rounded-lg text-sm font-medium hover:border-[#D4AF37]/50 hover:text-[#B69121] transition-colors shadow-sm text-stone-600">
-            <Filter className="h-4 w-4" /> 
-            <span>Filtrer</span>
-          </button>
+           {/* ✅ 3. MENU DÉROULANT DE FILTRE ACTIF */}
+           <div className="relative group">
+             {/* Icône positionnée en absolu par-dessus le select */}
+             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 group-hover:text-[#D4AF37] pointer-events-none" />
+             
+             <select
+               value={statusFilter}
+               onChange={(e) => setStatusFilter(e.target.value)}
+               className="appearance-none pl-9 pr-8 py-2.5 bg-white border border-stone-200 rounded-lg text-sm font-medium hover:border-[#D4AF37]/50 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/20 transition-all cursor-pointer text-stone-600 shadow-sm"
+             >
+               <option value="ALL">Tout voir</option>
+               <option value="PENDING">En attente</option>
+               <option value="ACCEPTED">Affecté</option>
+               <option value="IN_PROGRESS">En cours</option>
+               <option value="COMPLETED">Terminé</option>
+               <option value="CANCELLED">Annulé</option>
+             </select>
+           </div>
           
-          {/* Note: In a real app, this might open a modal or link to a create page */}
-          <button className="flex items-center gap-2 bg-blue-950 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-blue-900/20 hover:bg-blue-900 transition-all">
-            <Plus className="h-4 w-4" /> Créer un ticket
-          </button>
+          {/* ✅ 4. BOUTON CRÉER (Via Modal) */}
+          <CreateTicketModal onSuccess={loadData} />
         </div>
       </div>
 
@@ -89,8 +115,8 @@ export default function TicketsPage() {
       {/* --- TABLEAU DES TICKETS RÉELS --- */}
       {!isLoading && !error && (
         <TicketTable 
-          data={tickets} 
-          artisans={artisans} // ✅ Pass the artisans to the table
+          data={filteredTickets} // 👈 On passe la liste FILTRÉE ici
+          artisans={artisans} 
         />
       )}
 
