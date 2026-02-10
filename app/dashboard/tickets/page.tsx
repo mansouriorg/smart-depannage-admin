@@ -1,32 +1,36 @@
 "use client"; // ✅ Required for useEffect and useState
 
 import { useEffect, useState } from "react";
-import { Filter, Loader2, RefreshCcw } from "lucide-react";
+import { Filter, Loader2, RefreshCcw, Plus } from "lucide-react";
 import api from "@/lib/api"; // ✅ Use your configured Axios helper
 import { TicketTable } from "@/components/tickets/ticket-table";
 
 export default function TicketsPage() {
   const [tickets, setTickets] = useState([]);
+  const [artisans, setArtisans] = useState([]); // ✅ State for Artisans
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // 1. Fetch data from the server on load
   useEffect(() => {
-    loadTickets();
+    loadData();
   }, []);
 
-  const loadTickets = async () => {
+  const loadData = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      // 🚀 Calls GET /api/interventions
-      // Since your api helper attaches the 'adminToken', 
-      // the backend will return all tickets for the Admin.
-      const response = await api.get("/interventions");
-      setTickets(response.data);
+      // 🚀 Parallel Fetch: Get Tickets AND Artisans at the same time
+      const [ticketsRes, artisansRes] = await Promise.all([
+        api.get("/interventions"),
+        api.get("/users/artisans") // ✅ Fetch the list of technicians
+      ]);
+
+      setTickets(ticketsRes.data);
+      setArtisans(artisansRes.data);
     } catch (err: any) {
-      console.error("Error fetching tickets:", err);
-      setError("Impossible de charger les interventions.");
+      console.error("Error fetching data:", err);
+      setError("Impossible de charger les données.");
     } finally {
       setIsLoading(false);
     }
@@ -49,8 +53,9 @@ export default function TicketsPage() {
         <div className="flex gap-3">
            {/* Refresh Button */}
            <button 
-            onClick={loadTickets}
-            className="flex items-center gap-2 bg-white border border-stone-200 px-4 py-2.5 rounded-lg text-sm font-medium hover:border-[#D4AF37]/50 hover:text-[#B69121] transition-colors shadow-sm text-stone-600"
+            onClick={loadData}
+            disabled={isLoading}
+            className="flex items-center gap-2 bg-white border border-stone-200 px-4 py-2.5 rounded-lg text-sm font-medium hover:border-[#D4AF37]/50 hover:text-[#B69121] transition-colors shadow-sm text-stone-600 disabled:opacity-50"
           >
             <RefreshCcw className={isLoading ? "h-4 w-4 animate-spin" : "h-4 w-4"} /> 
           </button>
@@ -60,8 +65,9 @@ export default function TicketsPage() {
             <span>Filtrer</span>
           </button>
           
-          <button className="bg-blue-950 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-blue-900/20 hover:bg-blue-900 transition-all">
-            + Créer un ticket
+          {/* Note: In a real app, this might open a modal or link to a create page */}
+          <button className="flex items-center gap-2 bg-blue-950 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-blue-900/20 hover:bg-blue-900 transition-all">
+            <Plus className="h-4 w-4" /> Créer un ticket
           </button>
         </div>
       </div>
@@ -70,7 +76,7 @@ export default function TicketsPage() {
       {isLoading && (
         <div className="flex flex-col items-center justify-center py-20 space-y-4">
           <Loader2 className="h-10 w-10 text-[#D4AF37] animate-spin" />
-          <p className="text-stone-500 font-medium">Récupération des tickets...</p>
+          <p className="text-stone-500 font-medium">Récupération des données...</p>
         </div>
       )}
 
@@ -82,7 +88,10 @@ export default function TicketsPage() {
 
       {/* --- TABLEAU DES TICKETS RÉELS --- */}
       {!isLoading && !error && (
-        <TicketTable data={tickets} />
+        <TicketTable 
+          data={tickets} 
+          artisans={artisans} // ✅ Pass the artisans to the table
+        />
       )}
 
     </div>

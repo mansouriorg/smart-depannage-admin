@@ -8,50 +8,67 @@ import {
   MapPin, 
   Star, 
   Phone, 
-  MoreHorizontal,
   Plus,
   Wrench,
-  Zap,
-  Key,
-  Users,
+  Mail,
   Loader2,
-  Mail
+  Trash2, // ✅ Icon for deactivation
+  Ban
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// Interface matching your User model from the API
 interface Technician {
   id: number;
   name: string;
   email: string;
   phone: string;
   role: "ARTISAN";
-  // These fields are mock for now until added to DB schema
+  isActive: boolean; // ✅ Added this field
   specialty?: string; 
   status?: string;
   location?: string;
   rating?: number;
-  interventionCount?: number;
 }
 
 export default function TechniciansPage() {
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // 1. Fetch Data
+  const fetchTechnicians = async () => {
+    try {
+      const res = await api.get("/users/artisans");
+      setTechnicians(res.data);
+    } catch (err) {
+      console.error("Failed to fetch technicians", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchTechnicians = async () => {
-      try {
-        // ✅ Fetch real artisans from your NestJS backend
-        const res = await api.get("/users/artisans");
-        setTechnicians(res.data);
-      } catch (err) {
-        console.error("Failed to fetch technicians", err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchTechnicians();
   }, []);
+
+  // 2. ✅ Handle Deactivation (Ban)
+  const handleDeactivate = async (id: number) => {
+    if (!confirm("Êtes-vous sûr de vouloir désactiver ce technicien ? Il ne pourra plus se connecter.")) return;
+
+    try {
+      // Calls DELETE /users/:id (which performs Soft Delete in your backend)
+      await api.delete(`/users/${id}`);
+      
+      // Update UI locally (switch isActive to false)
+      setTechnicians(prev => prev.map(tech => 
+        tech.id === id ? { ...tech, isActive: false } : tech
+      ));
+      
+      alert("Technicien désactivé avec succès.");
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de la désactivation.");
+    }
+  };
 
   if (loading) {
     return (
@@ -67,24 +84,18 @@ export default function TechniciansPage() {
       {/* --- HEADER --- */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-blue-950 tracking-tight">
-            Techniciens
-          </h1>
+          <h1 className="text-3xl font-bold text-blue-950 tracking-tight">Techniciens</h1>
           <p className="text-stone-500 mt-1">
-            Gérez votre flotte d'experts ({technicians.length} actifs).
+            Gérez votre flotte d'experts ({technicians.filter(t => t.isActive).length} actifs).
           </p>
         </div>
         
         <div className="flex gap-3">
+           {/* Search & Add Button (unchanged) */}
            <div className="relative">
              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
-             <input 
-               type="text" 
-               placeholder="Rechercher..." 
-               className="pl-9 pr-4 py-2.5 rounded-lg border border-stone-200 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 transition-all"
-             />
+             <input type="text" placeholder="Rechercher..." className="pl-9 pr-4 py-2.5 rounded-lg border border-stone-200 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 transition-all" />
            </div>
-           
            <Link href="/dashboard/applications">
              <Button className="bg-[#D4AF37] hover:bg-[#B69121] text-white font-bold shadow-md shadow-[#D4AF37]/20 border-t border-[#F3DFA2]/30">
                <Plus className="mr-2 h-4 w-4" /> Ajouter
@@ -96,24 +107,38 @@ export default function TechniciansPage() {
       {/* --- GRID --- */}
       {technicians.length === 0 ? (
         <div className="text-center py-20 bg-stone-50 rounded-xl border border-stone-200 border-dashed">
-          <Users className="h-10 w-10 text-stone-300 mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-stone-600">Aucun technicien trouvé</h3>
-          <p className="text-stone-400 text-sm">Approuvez des candidatures pour ajouter des experts.</p>
+          <Loader2 className="h-10 w-10 text-stone-300 mx-auto mb-3 animate-spin" /> 
+          <p className="text-stone-400 text-sm">Chargement ou aucun technicien...</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {technicians.map((tech) => (
-            <div key={tech.id} className="bg-white border border-stone-200 rounded-xl p-6 shadow-sm hover:shadow-lg hover:shadow-[#D4AF37]/10 hover:border-[#D4AF37]/30 transition-all group relative">
+            <div 
+              key={tech.id} 
+              className={`border rounded-xl p-6 shadow-sm transition-all relative group ${
+                tech.isActive 
+                  ? "bg-white border-stone-200 hover:shadow-lg hover:border-[#D4AF37]/30" 
+                  : "bg-stone-50 border-stone-200 opacity-70 grayscale"
+              }`}
+            >
               
-              <button className="absolute top-4 right-4 text-stone-400 hover:text-stone-600">
-                <MoreHorizontal className="h-5 w-5" />
-              </button>
+              {/* ✅ 3. DEACTIVATE BUTTON */}
+              {tech.isActive && (
+                <button 
+                  onClick={() => handleDeactivate(tech.id)}
+                  className="absolute top-4 right-4 text-stone-300 hover:text-red-500 transition-colors p-1"
+                  title="Désactiver le compte"
+                >
+                  <Trash2 className="h-5 w-5" />
+                </button>
+              )}
 
               {/* Header */}
               <div className="flex items-center gap-4 mb-6">
-                <div className="h-16 w-16 rounded-full bg-stone-100 flex items-center justify-center border-2 border-stone-100 group-hover:border-[#D4AF37] transition-colors overflow-hidden">
-                   {/* Initials Avatar */}
-                   <span className="text-xl font-bold text-stone-500 group-hover:text-[#B69121]">
+                <div className={`h-16 w-16 rounded-full flex items-center justify-center border-2 transition-colors overflow-hidden ${
+                  tech.isActive ? "bg-stone-100 border-stone-100 group-hover:border-[#D4AF37]" : "bg-stone-200 border-stone-200"
+                }`}>
+                   <span className={`text-xl font-bold ${tech.isActive ? "text-stone-500 group-hover:text-[#B69121]" : "text-stone-400"}`}>
                      {tech.name?.charAt(0) || "T"}
                    </span>
                 </div>
@@ -121,7 +146,6 @@ export default function TechniciansPage() {
                   <h3 className="font-bold text-lg text-blue-950 truncate max-w-[150px]">{tech.name}</h3>
                   <div className="flex items-center gap-1.5 text-sm text-[#B69121] font-medium">
                     <Wrench className="h-3.5 w-3.5" />
-                    {/* Fallback specialty until added to User model */}
                     {tech.specialty || "Technicien Polyvalent"}
                   </div>
                 </div>
@@ -130,31 +154,32 @@ export default function TechniciansPage() {
               {/* Info Details */}
               <div className="space-y-3 mb-6">
                  <div className="flex items-center justify-between text-sm">
-                   <span className="text-stone-500 flex items-center gap-2">
-                     <Phone className="h-4 w-4" /> Tél
-                   </span>
-                   <span className="font-medium text-blue-950">{tech.phone || "Non renseigné"}</span>
+                   <span className="text-stone-500 flex items-center gap-2"><Phone className="h-4 w-4" /> Tél</span>
+                   <span className="font-medium text-blue-950">{tech.phone || "-"}</span>
                  </div>
                  <div className="flex items-center justify-between text-sm">
-                   <span className="text-stone-500 flex items-center gap-2">
-                     <Mail className="h-4 w-4" /> Email
-                   </span>
+                   <span className="text-stone-500 flex items-center gap-2"><Mail className="h-4 w-4" /> Email</span>
                    <span className="font-medium text-blue-950 truncate max-w-[150px]" title={tech.email}>{tech.email}</span>
                  </div>
                  <div className="flex items-center justify-between text-sm">
-                   <span className="text-stone-500 flex items-center gap-2">
-                     <MapPin className="h-4 w-4" /> Zone
-                   </span>
+                   <span className="text-stone-500 flex items-center gap-2"><MapPin className="h-4 w-4" /> Zone</span>
                    <span className="font-medium text-blue-950">{tech.location || "Grand Tunis"}</span>
                  </div>
               </div>
 
-              {/* Status Footer */}
+              {/* ✅ 4. STATUS FOOTER (Active vs Banned) */}
               <div className="pt-4 border-t border-stone-100 flex items-center justify-between">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  Disponible
-                </span>
+                {tech.isActive ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    Compte Actif
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border bg-red-50 text-red-700 border-red-200">
+                    <Ban className="h-3 w-3" />
+                    Désactivé
+                  </span>
+                )}
                 
                 <div className="text-xs text-stone-400 font-medium flex items-center gap-1">
                   <Star className="h-3 w-3 text-[#D4AF37] fill-[#D4AF37]" />

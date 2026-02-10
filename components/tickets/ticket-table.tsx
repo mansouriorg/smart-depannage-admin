@@ -12,7 +12,13 @@ import { fr } from "date-fns/locale";
 // ✅ Import the new Actions component
 import { TicketActions } from "./ticket-actions"; 
 
-// ✅ 1. Match the Interface to your Real Backend Data
+// Definition of an Artisan
+interface Artisan {
+  id: number;
+  name: string;
+}
+
+// ✅ Match the Interface to your Real Backend Data
 interface Ticket {
   id: number;
   serviceType: string;
@@ -24,7 +30,7 @@ interface Ticket {
     name: string;
     phone?: string;
   };
-  // Added artisan so the dropdown knows who is already assigned
+  artisanId?: number; // Needed to show current selection
   artisan?: {
     id: number;
     name: string;
@@ -33,9 +39,10 @@ interface Ticket {
 
 interface TicketTableProps {
   data: Ticket[];
+  artisans: Artisan[]; // 👈 ✅ ADDED THIS PROP
 }
 
-export function TicketTable({ data }: TicketTableProps) {
+export function TicketTable({ data, artisans }: TicketTableProps) {
   return (
     <div className="bg-white border border-stone-200 rounded-xl shadow-xl shadow-stone-200/40 overflow-hidden">
       <div className="overflow-x-auto">
@@ -116,9 +123,13 @@ export function TicketTable({ data }: TicketTableProps) {
                     </div>
                   </td>
 
-                  {/* 5. ACTIONS (Replaced static buttons with the dynamic component) */}
+                  {/* 5. ACTIONS */}
                   <td className="px-6 py-4 text-right">
-                    <TicketActions ticket={ticket} />
+                    {/* ✅ PASS THE ARTISANS LIST HERE */}
+                    <TicketActions 
+                      ticket={ticket} 
+                      artisans={artisans} 
+                    />
                   </td>
 
                 </tr>
@@ -132,7 +143,6 @@ export function TicketTable({ data }: TicketTableProps) {
       <div className="bg-stone-50 px-6 py-4 border-t border-stone-200 flex items-center justify-between text-xs text-stone-500 rounded-b-xl border-x border-b">
           <span>{data.length} résultats affichés</span>
           <div className="flex gap-2">
-            {/* Disabled for now as backend pagination isn't implemented yet */}
             <button className="px-3 py-1 bg-white border border-stone-200 rounded text-stone-400 text-xs cursor-not-allowed" disabled>Précédent</button>
             <button className="px-3 py-1 bg-white border border-stone-200 rounded text-stone-400 text-xs cursor-not-allowed" disabled>Suivant</button>
           </div>
