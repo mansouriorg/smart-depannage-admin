@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import Link from "next/link";
-import { MOCK_TICKETS } from "@/lib/mock-data"; // On réutilise vos fausses données
+import { MOCK_TICKETS } from "@/lib/mock-data"; 
 
 export default function DashboardPage() {
   // Calculs simples basés sur les fausses données
@@ -31,10 +31,10 @@ export default function DashboardPage() {
       {/* --- CARTES KPI (Indicateurs) --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         
-        {/* KPI 1 : Chiffre d'affaires (OR) */}
+        {/* KPI 1 : Chiffre d'affaires (OR) -> Updated to EURO */}
         <StatCard 
           title="Chiffre d'affaires (Mois)" 
-          value="12,450 TND" 
+          value="12 450 €" 
           trend="+15% vs janv."
           icon={TrendingUp}
           theme="gold"
@@ -46,7 +46,7 @@ export default function DashboardPage() {
           value={pendingTickets.toString()} 
           trend="Action requise"
           icon={AlertCircle}
-          theme="danger" // Rouge pour alerter, mais stylisé propre
+          theme="danger" 
         />
 
         {/* KPI 3 : Techniciens Actifs (BLEU) */}
