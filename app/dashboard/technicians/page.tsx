@@ -12,8 +12,9 @@ import {
   Wrench,
   Mail,
   Loader2,
-  Trash2, // ✅ Icon for deactivation
-  Ban
+  Trash2, 
+  Ban,
+  ExternalLink // ✅ Icon for opening map
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -23,18 +24,19 @@ interface Technician {
   email: string;
   phone: string;
   role: "ARTISAN";
-  isActive: boolean; // ✅ Added this field
+  isActive: boolean;
   specialty?: string; 
-  status?: string;
-  location?: string;
-  rating?: number;
+  // ✅ UPDATED: Match the backend fields
+  latitude?: number;
+  longitude?: number;
+  // We keep location as a fallback string if you add it later
+  location?: string; 
 }
 
 export default function TechniciansPage() {
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 1. Fetch Data
   const fetchTechnicians = async () => {
     try {
       const res = await api.get("/users/artisans");
@@ -50,24 +52,22 @@ export default function TechniciansPage() {
     fetchTechnicians();
   }, []);
 
-  // 2. ✅ Handle Deactivation (Ban)
   const handleDeactivate = async (id: number) => {
-    if (!confirm("Êtes-vous sûr de vouloir désactiver ce technicien ? Il ne pourra plus se connecter.")) return;
-
+    if (!confirm("Êtes-vous sûr ?")) return;
     try {
-      // Calls DELETE /users/:id (which performs Soft Delete in your backend)
       await api.delete(`/users/${id}`);
-      
-      // Update UI locally (switch isActive to false)
       setTechnicians(prev => prev.map(tech => 
         tech.id === id ? { ...tech, isActive: false } : tech
       ));
-      
-      alert("Technicien désactivé avec succès.");
     } catch (err) {
-      console.error(err);
       alert("Erreur lors de la désactivation.");
     }
+  };
+
+  // ✅ Helper to generate Google Maps Link
+  const getMapLink = (lat?: number, lng?: number) => {
+    if (!lat || !lng) return null;
+    return `http://maps.google.com/maps?q=${lat},${lng}`;
   };
 
   if (loading) {
@@ -81,7 +81,7 @@ export default function TechniciansPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       
-      {/* --- HEADER --- */}
+      {/* HEADER */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-blue-950 tracking-tight">Techniciens</h1>
@@ -91,7 +91,6 @@ export default function TechniciansPage() {
         </div>
         
         <div className="flex gap-3">
-           {/* Search & Add Button (unchanged) */}
            <div className="relative">
              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
              <input type="text" placeholder="Rechercher..." className="pl-9 pr-4 py-2.5 rounded-lg border border-stone-200 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 transition-all" />
@@ -104,7 +103,7 @@ export default function TechniciansPage() {
         </div>
       </div>
 
-      {/* --- GRID --- */}
+      {/* GRID */}
       {technicians.length === 0 ? (
         <div className="text-center py-20 bg-stone-50 rounded-xl border border-stone-200 border-dashed">
           <Loader2 className="h-10 w-10 text-stone-300 mx-auto mb-3 animate-spin" /> 
@@ -122,25 +121,21 @@ export default function TechniciansPage() {
               }`}
             >
               
-              {/* ✅ 3. DEACTIVATE BUTTON */}
+              {/* DELETE BUTTON */}
               {tech.isActive && (
-                <button 
-                  onClick={() => handleDeactivate(tech.id)}
-                  className="absolute top-4 right-4 text-stone-300 hover:text-red-500 transition-colors p-1"
-                  title="Désactiver le compte"
-                >
+                <button onClick={() => handleDeactivate(tech.id)} className="absolute top-4 right-4 text-stone-300 hover:text-red-500 transition-colors p-1" title="Désactiver le compte">
                   <Trash2 className="h-5 w-5" />
                 </button>
               )}
 
-              {/* Header */}
+              {/* IDENTITY */}
               <div className="flex items-center gap-4 mb-6">
                 <div className={`h-16 w-16 rounded-full flex items-center justify-center border-2 transition-colors overflow-hidden ${
                   tech.isActive ? "bg-stone-100 border-stone-100 group-hover:border-[#D4AF37]" : "bg-stone-200 border-stone-200"
                 }`}>
-                   <span className={`text-xl font-bold ${tech.isActive ? "text-stone-500 group-hover:text-[#B69121]" : "text-stone-400"}`}>
-                     {tech.name?.charAt(0) || "T"}
-                   </span>
+                    <span className={`text-xl font-bold ${tech.isActive ? "text-stone-500 group-hover:text-[#B69121]" : "text-stone-400"}`}>
+                      {tech.name?.charAt(0) || "T"}
+                    </span>
                 </div>
                 <div>
                   <h3 className="font-bold text-lg text-blue-950 truncate max-w-[150px]">{tech.name}</h3>
@@ -151,23 +146,38 @@ export default function TechniciansPage() {
                 </div>
               </div>
 
-              {/* Info Details */}
+              {/* CONTACT & LOCATION */}
               <div className="space-y-3 mb-6">
-                 <div className="flex items-center justify-between text-sm">
-                   <span className="text-stone-500 flex items-center gap-2"><Phone className="h-4 w-4" /> Tél</span>
-                   <span className="font-medium text-blue-950">{tech.phone || "-"}</span>
-                 </div>
-                 <div className="flex items-center justify-between text-sm">
-                   <span className="text-stone-500 flex items-center gap-2"><Mail className="h-4 w-4" /> Email</span>
-                   <span className="font-medium text-blue-950 truncate max-w-[150px]" title={tech.email}>{tech.email}</span>
-                 </div>
-                 <div className="flex items-center justify-between text-sm">
-                   <span className="text-stone-500 flex items-center gap-2"><MapPin className="h-4 w-4" /> Zone</span>
-                   <span className="font-medium text-blue-950">{tech.location || "Grand Tunis"}</span>
-                 </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-stone-500 flex items-center gap-2"><Phone className="h-4 w-4" /> Tél</span>
+                    <span className="font-medium text-blue-950">{tech.phone || "-"}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-stone-500 flex items-center gap-2"><Mail className="h-4 w-4" /> Email</span>
+                    <span className="font-medium text-blue-950 truncate max-w-[150px]" title={tech.email}>{tech.email}</span>
+                  </div>
+
+                  {/* ✅ REAL LOCATION DISPLAY */}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-stone-500 flex items-center gap-2"><MapPin className="h-4 w-4" /> Position</span>
+                    
+                    {tech.latitude && tech.longitude ? (
+                      <a 
+                        href={getMapLink(tech.latitude, tech.longitude) || "#"} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-blue-600 hover:underline font-medium cursor-pointer"
+                      >
+                        Voir sur la carte <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : (
+                      <span className="font-medium text-stone-400 italic">Non disponible</span>
+                    )}
+                  </div>
               </div>
 
-              {/* ✅ 4. STATUS FOOTER (Active vs Banned) */}
+              {/* FOOTER */}
               <div className="pt-4 border-t border-stone-100 flex items-center justify-between">
                 {tech.isActive ? (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200">
