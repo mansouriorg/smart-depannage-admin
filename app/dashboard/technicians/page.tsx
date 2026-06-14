@@ -1,22 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import api from "@/lib/api";
 import { 
   Search, 
   MapPin, 
   Star, 
   Phone, 
-  Plus,
   Wrench,
   Mail,
   Loader2,
   Trash2, 
   Ban,
-  ExternalLink // ✅ Icon for opening map
+  ExternalLink 
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+
+// ✅ 1. IMPORT THE NEW MODAL HERE
+import { CreateTechnicianModal } from "@/components/technicians/create-technician-modal";
 
 interface Technician {
   id: number;
@@ -26,10 +26,8 @@ interface Technician {
   role: "ARTISAN";
   isActive: boolean;
   specialty?: string; 
-  // ✅ UPDATED: Match the backend fields
   latitude?: number;
   longitude?: number;
-  // We keep location as a fallback string if you add it later
   location?: string; 
 }
 
@@ -64,7 +62,6 @@ export default function TechniciansPage() {
     }
   };
 
-  // ✅ Helper to generate Google Maps Link
   const getMapLink = (lat?: number, lng?: number) => {
     if (!lat || !lng) return null;
     return `http://maps.google.com/maps?q=${lat},${lng}`;
@@ -95,11 +92,9 @@ export default function TechniciansPage() {
              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
              <input type="text" placeholder="Rechercher..." className="pl-9 pr-4 py-2.5 rounded-lg border border-stone-200 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 transition-all" />
            </div>
-           <Link href="/dashboard/applications">
-             <Button className="bg-[#D4AF37] hover:bg-[#B69121] text-white font-bold shadow-md shadow-[#D4AF37]/20 border-t border-[#F3DFA2]/30">
-               <Plus className="mr-2 h-4 w-4" /> Ajouter
-             </Button>
-           </Link>
+           
+           {/* ✅ 2. REPLACED THE OLD LINK WITH THE MODAL */}
+           <CreateTechnicianModal onSuccess={fetchTechnicians} />
         </div>
       </div>
 
