@@ -4,8 +4,10 @@ import {
   MapPin, 
   Calendar, 
   User,
-  Phone // ✅ Added Phone Icon
+  Phone,
+  Eye // ✅ 1. Imported the Eye icon
 } from "lucide-react";
+import { useRouter } from "next/navigation"; // ✅ 2. Imported the Next.js router
 import { TicketStatusBadge } from "./ticket-status-badge";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -17,7 +19,7 @@ interface Artisan {
   name: string;
 }
 
-// ✅ Match the Interface to your Real Backend Data
+// Match the Interface to your Real Backend Data
 interface Ticket {
   id: number;
   serviceType: string;
@@ -27,9 +29,9 @@ interface Ticket {
   createdAt: string;
   client?: {
     name: string;
-    phone?: string; // ✅ We will use this
+    phone?: string; 
   };
-  artisanId?: number; // Needed to show current selection
+  artisanId?: number; 
   artisan?: {
     id: number;
     name: string;
@@ -38,10 +40,12 @@ interface Ticket {
 
 interface TicketTableProps {
   data: Ticket[];
-  artisans: Artisan[]; // 👈 ✅ ADDED THIS PROP
+  artisans: Artisan[]; 
 }
 
 export function TicketTable({ data, artisans }: TicketTableProps) {
+  const router = useRouter(); // ✅ 3. Initialize the router
+
   return (
     <div className="bg-white border border-stone-200 rounded-xl shadow-xl shadow-stone-200/40 overflow-hidden">
       <div className="overflow-x-auto">
@@ -71,13 +75,15 @@ export function TicketTable({ data, artisans }: TicketTableProps) {
               data.map((ticket) => (
                 <tr 
                   key={ticket.id} 
-                  className="group hover:bg-[#D4AF37]/5 transition-colors duration-200"
+                  // ✅ 4. Make the entire row clickable to navigate to details
+                  onClick={() => router.push(`/dashboard/tickets/${ticket.id}`)}
+                  // ✅ Added cursor-pointer so the mouse changes to a hand
+                  className="group hover:bg-[#D4AF37]/5 transition-colors duration-200 cursor-pointer"
                 >
                   
-                  {/* 1. Client Info (UPDATED WITH PHONE) */}
+                  {/* 1. Client Info */}
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      {/* Avatar */}
                       <div className="h-10 w-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-400 border border-stone-200 group-hover:border-[#D4AF37]/30 group-hover:text-[#B69121] transition-colors">
                         <User className="h-5 w-5" />
                       </div>
@@ -85,8 +91,6 @@ export function TicketTable({ data, artisans }: TicketTableProps) {
                         <div className="font-bold text-blue-950 group-hover:text-[#B69121] transition-colors">
                           {ticket.client?.name || "Client Invité"}
                         </div>
-                        
-                        {/* ✅ DISPLAY PHONE NUMBER HERE */}
                         <div className="text-stone-400 text-xs font-medium flex items-center gap-1.5 mt-0.5">
                           <Phone className="h-3 w-3 text-[#D4AF37]" />
                           <span>{ticket.client?.phone || "Non renseigné"}</span>
@@ -127,11 +131,22 @@ export function TicketTable({ data, artisans }: TicketTableProps) {
 
                   {/* 5. ACTIONS */}
                   <td className="px-6 py-4 text-right">
-                    {/* ✅ PASS THE ARTISANS LIST HERE */}
-                    <TicketActions 
-                      ticket={ticket} 
-                      artisans={artisans} 
-                    />
+                    {/* ✅ 5. Wrap actions in a div that STOPS the click event so clicking buttons doesn't trigger the row navigation */}
+                    <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                      
+                      {/* Visual indicator that the row has a details page */}
+                      <div 
+                        className="p-2 text-stone-400 group-hover:text-[#B69121] group-hover:bg-[#D4AF37]/10 rounded-lg transition-colors" 
+                        title="Voir les détails du dossier"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </div>
+
+                      <TicketActions 
+                        ticket={ticket} 
+                        artisans={artisans} 
+                      />
+                    </div>
                   </td>
 
                 </tr>
