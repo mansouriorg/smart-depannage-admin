@@ -12,7 +12,8 @@ import {
   Wrench,
   Phone,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  AlertTriangle // ✅ Added AlertTriangle for the issue block
 } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api"; 
@@ -164,6 +165,24 @@ export default function TicketDetailsPage() {
               {ticket.description}
             </div>
           </div>
+
+          {/* ✅ NEW: Bloc 2.5: ALERTES EN COURS (Signalement de retard, etc.) */}
+          {ticket.hasIssue && ticket.feedbackNotes && (
+            <div className="bg-red-50 p-6 rounded-xl border border-red-200 shadow-sm animate-pulse-subtle">
+              <h2 className="text-lg font-bold text-red-800 flex items-center gap-2 mb-4 uppercase tracking-wider text-sm">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+                Signalement Actif du Client
+              </h2>
+              <div className="p-4 bg-white rounded-lg border border-red-100 text-red-900 whitespace-pre-wrap font-medium">
+                {ticket.feedbackNotes}
+              </div>
+              {ticket.status !== 'COMPLETED' && (
+                <p className="text-xs text-red-600 mt-3 italic">
+                  Cette alerte a été soumise pendant que l'intervention est toujours en cours.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* 📸 Bloc 3: PREUVE DE TRAVAIL SÉCURISÉE (Affiché uniquement si terminé) */}
           {ticket.status === 'COMPLETED' && ticket.afterPhotoUrl && (

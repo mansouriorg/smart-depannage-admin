@@ -9,7 +9,8 @@ import {
   Settings, 
   ShieldCheck, 
   LogOut,
-  FileText // ✅ Icon for Applications
+  FileText, // ✅ Icon for Applications
+  Star // ✅ NEW: Icon for Feedbacks
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,7 +25,6 @@ const sidebarItems = [
     label: "Interventions", 
     href: "/dashboard/tickets" 
   },
-  // ✅ NEW: Applications Page
   { 
     icon: FileText, 
     label: "Candidatures", 
@@ -34,6 +34,12 @@ const sidebarItems = [
     icon: Users, 
     label: "Techniciens", 
     href: "/dashboard/technicians" 
+  },
+  // ✅ NEW: Feedbacks Page
+  { 
+    icon: Star, 
+    label: "Avis & Retours", 
+    href: "/dashboard/feedbacks" 
   },
   { 
     icon: Settings, 
