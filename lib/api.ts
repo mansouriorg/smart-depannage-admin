@@ -53,4 +53,34 @@ export function unwrapList<T = unknown>(payload: unknown): T[] {
   return Array.isArray(inner) ? (inner as T[]) : [];
 }
 
+/**
+ * The sentence the server gave for a refused request, to show to the person
+ * ("Cet artisan n’est pas encore approuvé."), or `fallback` when the server
+ * said nothing readable (network down, server error).
+ *
+ * The API answers { message: string | string[], issues?: string[] }: `issues`
+ * lists why an artisan is not free ("Artisan déjà réservé sur ce créneau.").
+ */
+export function apiErrorMessage(error: unknown, fallback: string): string {
+  const response = (error as { response?: { status?: number; data?: { message?: unknown; issues?: unknown } } } | null)?.response;
+  const data = response?.data;
+
+  // A server error says "Internal server error": nothing a dispatcher can use.
+  if (typeof response?.status === "number" && response.status >= 500) return fallback;
+
+  const message = Array.isArray(data?.message)
+    ? data.message.filter((item): item is string => typeof item === "string").join(" ")
+    : typeof data?.message === "string"
+      ? data.message
+      : "";
+
+  const issues = Array.isArray(data?.issues)
+    ? data.issues.filter((item): item is string => typeof item === "string")
+    : [];
+
+  const text = [message, ...issues].filter(Boolean).join("\n");
+
+  return text || fallback;
+}
+
 export default api;

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Filter, Loader2, RefreshCcw } from "lucide-react";
 import api, { unwrapList } from "@/lib/api"; // ✅ Use your configured Axios helper
+import { dashboardStatus } from "@/lib/ticket-status";
 import { TicketTable } from "@/components/tickets/ticket-table";
 // ✅ IMPORT THE NEW MODAL
 import { CreateTicketModal } from "@/components/tickets/create-ticket-modal";
@@ -28,7 +29,8 @@ export default function TicketsPage() {
       // 🚀 Parallel Fetch: Get Tickets AND Artisans at the same time
       const [ticketsRes, artisansRes] = await Promise.all([
         api.get("/interventions"),
-        api.get("/users/artisans") 
+        // Only the artisans a job can be given to: approved and active (P1-05)
+        api.get("/users/artisans?assignable=true&limit=200")
       ]);
 
       // /users/artisans answers { data, meta }: unwrap it (P0-12)
@@ -45,7 +47,7 @@ export default function TicketsPage() {
   // ✅ 2. LOGIQUE DE FILTRAGE
   const filteredTickets = tickets.filter((ticket: any) => {
     if (statusFilter === "ALL") return true;
-    return ticket.status === statusFilter;
+    return dashboardStatus(ticket.status) === statusFilter;
   });
 
   return (
@@ -87,6 +89,7 @@ export default function TicketsPage() {
              >
                <option value="ALL">Tout voir</option>
                <option value="PENDING">En attente</option>
+               <option value="ASSIGNED">Assigné</option>
                <option value="ACCEPTED">Affecté</option>
                <option value="IN_PROGRESS">En cours</option>
                <option value="COMPLETED">Terminé</option>

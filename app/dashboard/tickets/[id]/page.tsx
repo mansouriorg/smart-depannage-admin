@@ -18,6 +18,7 @@ import {
 import Link from "next/link";
 import api from "@/lib/api"; 
 import { SERVER_URL } from "@/lib/config";
+import { dashboardStatus } from "@/lib/ticket-status";
 import { clsx } from "clsx";
 
 export default function TicketDetailsPage() {
@@ -54,9 +55,11 @@ export default function TicketDetailsPage() {
   };
 
   // Helper for Status Badge styling
-  const getStatusStyle = (status: string) => {
+  const getStatusStyle = (rawStatus: string) => {
+    const status = dashboardStatus(rawStatus);
     switch (status) {
       case "PENDING": return "bg-amber-50 text-amber-600 border-amber-200";
+      case "ASSIGNED": return "bg-sky-50 text-sky-600 border-sky-200";
       case "ACCEPTED": return "bg-blue-50 text-blue-600 border-blue-200";
       case "IN_PROGRESS": return "bg-purple-50 text-purple-600 border-purple-200";
       case "COMPLETED": return "bg-emerald-50 text-emerald-600 border-emerald-200";
@@ -65,9 +68,11 @@ export default function TicketDetailsPage() {
     }
   };
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (rawStatus: string) => {
+    const status = dashboardStatus(rawStatus);
     switch (status) {
       case "PENDING": return "En attente";
+      case "ASSIGNED": return "Assigné";
       case "ACCEPTED": return "Affecté";
       case "IN_PROGRESS": return "En cours";
       case "COMPLETED": return "Terminé";

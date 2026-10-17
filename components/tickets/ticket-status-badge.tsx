@@ -7,6 +7,7 @@ import {
   HelpCircle 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { dashboardStatus } from "@/lib/ticket-status";
 
 interface TicketStatusBadgeProps {
   status: string;
@@ -26,6 +27,14 @@ export function TicketStatusBadge({ status }: TicketStatusBadgeProps) {
       className: "bg-[#D4AF37]/10 text-[#B69121] border-[#D4AF37]/20 ring-[#D4AF37]/10",
     },
     
+    // Status: Assigné (ASSIGNED) - un artisan a la mission, il ne l'a pas encore acceptée
+    ASSIGNED: {
+      label: "Assigné",
+      icon: User,
+      // STYLE CIEL
+      className: "bg-sky-50 text-sky-700 border-sky-200 ring-sky-500/10",
+    },
+
     // Status: Accepté (ACCEPTED) - Souvent utilisé pour "Affecté"
     ACCEPTED: {
       label: "Affecté",
@@ -61,7 +70,7 @@ export function TicketStatusBadge({ status }: TicketStatusBadgeProps) {
 
   // 2. 🛡️ SAFE GUARD: Fallback if status is unknown/undefined
   // This prevents the "Cannot destructure property label of undefined" error.
-  const statusConfig = config[status] || {
+  const statusConfig = config[dashboardStatus(status)] || {
     label: status || "Inconnu",
     icon: HelpCircle,
     className: "bg-gray-100 text-gray-600 border-gray-200",

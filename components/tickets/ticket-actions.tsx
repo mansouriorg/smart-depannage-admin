@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { Loader2, UserPlus, CheckCircle2 } from "lucide-react";
-import api from "@/lib/api";
+import api, { apiErrorMessage } from "@/lib/api";
 import { useRouter } from "next/navigation";
+import { dashboardStatus } from "@/lib/ticket-status";
 
 // 1. Define the Artisan Interface
 interface Artisan {
@@ -21,6 +22,14 @@ export function TicketActions({ ticket, artisans }: TicketActionsProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
+  // The artisan who has the job is always in the menu, even when they are no longer
+  // assignable (suspended, or beyond the first page of the list): the menu says who has it.
+  const current = ticket.artisanId
+    ? ticket.artisan ?? { id: ticket.artisanId, name: `Artisan #${ticket.artisanId}` }
+    : null;
+  const options: Artisan[] =
+    current && !artisans.some((artisan) => artisan.id === current.id) ? [current, ...artisans] : artisans;
+
   // --- 1. Handle Status Change ---
   const handleStatusChange = async (newStatus: string) => {
     setIsLoading(true);
@@ -37,19 +46,23 @@ export function TicketActions({ ticket, artisans }: TicketActionsProps) {
   };
 
   // --- 2. Handle Technician Assignment ---
-  const handleAssignArtisan = async (artisanId: string) => {
+  const handleAssignArtisan = async (artisanId: string, select: HTMLSelectElement) => {
     if (!artisanId) return;
     setIsLoading(true);
     try {
-      // Sends the Artisan ID to the backend. 
-      // The backend will automatically link the user and set status to ACCEPTED.
+      // Sends the Artisan ID to the backend. The server checks that the artisan is
+      // approved and free and that the job can be assigned (P1-05), then links the
+      // two and sets the status to "Affecté" (accepted), as this menu always did.
       await api.patch(`/interventions/${ticket.id}`, { artisanId: Number(artisanId) });
-      
+
       alert("Technicien assigné avec succès !");
-      window.location.reload(); 
+      window.location.reload();
     } catch (error) {
       console.error("Failed to assign artisan", error);
-      alert("Erreur lors de l'assignation.");
+      // The refusal says why (not approved, already booked, job already started...).
+      alert(apiErrorMessage(error, "Erreur lors de l'assignation."));
+      // The menu goes back to who really has the job.
+      select.value = ticket.artisanId ? String(ticket.artisanId) : "";
     } finally {
       setIsLoading(false);
     }
@@ -62,11 +75,13 @@ export function TicketActions({ ticket, artisans }: TicketActionsProps) {
       <div className="relative">
         <select
           disabled={isLoading}
-          defaultValue={ticket.status}
+          defaultValue={dashboardStatus(ticket.status)}
           onChange={(e) => handleStatusChange(e.target.value)}
           className="appearance-none bg-stone-50 border border-stone-200 text-stone-600 text-xs font-bold py-1.5 pl-3 pr-8 rounded-lg cursor-pointer hover:border-[#D4AF37] focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/20 disabled:opacity-50"
         >
           <option value="PENDING">En attente</option>
+          {/* "Assigné" is set by the assignment (an artisan is chosen), never by hand: shown, not selectable */}
+          <option value="ASSIGNED" disabled>Assigné</option>
           <option value="ACCEPTED">Affecté</option>
           <option value="IN_PROGRESS">En cours</option>
           <option value="COMPLETED">Terminé</option>
@@ -90,13 +105,13 @@ export function TicketActions({ ticket, artisans }: TicketActionsProps) {
             disabled={isLoading}
             // If an artisan is already assigned, select them. Otherwise default to ""
             defaultValue={ticket.artisanId || ""} 
-            onChange={(e) => handleAssignArtisan(e.target.value)}
+            onChange={(e) => handleAssignArtisan(e.target.value, e.target)}
             className="appearance-none w-[140px] bg-white border border-stone-200 text-stone-600 text-xs py-1.5 pl-8 pr-2 rounded-lg cursor-pointer hover:border-[#D4AF37] hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/20 disabled:opacity-50"
           >
             <option value="" disabled>Assigner...</option>
             
             {/* ✅ MAP OVER REAL ARTISANS */}
-            {artisans.map((artisan) => (
+            {options.map((artisan) => (
               <option key={artisan.id} value={artisan.id}>
                 {artisan.name}
               </option>
