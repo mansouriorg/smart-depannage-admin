@@ -12,13 +12,12 @@ import {
   Wrench,
   Phone,
   Loader2,
-  CheckCircle2,
   AlertTriangle // ✅ Added AlertTriangle for the issue block
 } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api"; 
-import { SERVER_URL } from "@/lib/config";
 import { dashboardStatus } from "@/lib/ticket-status";
+import { ProofsPanel } from "@/components/tickets/proofs-panel";
 import { clsx } from "clsx";
 
 export default function TicketDetailsPage() {
@@ -30,27 +29,27 @@ export default function TicketDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Uploaded files are served from the backend host, NOT under the "/api"
-  // prefix that NEXT_PUBLIC_API_URL carries.
-  const backendUrl = SERVER_URL;
-
   useEffect(() => {
     if (ticketId) {
       loadTicketDetails();
     }
   }, [ticketId]);
 
-  const loadTicketDetails = async () => {
-    setIsLoading(true);
-    setError(null);
+  // `quiet`: refresh the data in place (after a decision on a proof) without the
+  // loading screen, which would unmount the proofs panel that asked.
+  const loadTicketDetails = async (quiet = false) => {
+    if (!quiet) {
+      setIsLoading(true);
+      setError(null);
+    }
     try {
       const response = await api.get(`/interventions/${ticketId}`);
       setTicket(response.data);
     } catch (err: any) {
       console.error("Error fetching ticket:", err);
-      setError("Impossible de charger les détails de l'intervention.");
+      if (!quiet) setError("Impossible de charger les détails de l'intervention.");
     } finally {
-      setIsLoading(false);
+      if (!quiet) setIsLoading(false);
     }
   };
 
@@ -191,57 +190,8 @@ export default function TicketDetailsPage() {
             </div>
           )}
 
-          {/* 📸 Bloc 3: PREUVE DE TRAVAIL SÉCURISÉE (Affiché uniquement si terminé) */}
-          {ticket.status === 'COMPLETED' && ticket.afterPhotoUrl && (
-            <div className="bg-[#0f172a] p-6 rounded-xl shadow-lg border border-blue-900 text-white relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-[#D4AF37] rounded-full blur-[80px] opacity-10 pointer-events-none" />
-              
-              <h2 className="text-lg font-bold text-[#F3DFA2] flex items-center gap-2 mb-6 relative z-10">
-                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                Preuve de Travail Sécurisée
-              </h2>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 relative z-10">
-                <div className="rounded-lg overflow-hidden border-2 border-stone-700 bg-black/50 aspect-video relative">
-                  <img 
-                    src={`${backendUrl}${ticket.afterPhotoUrl}`} 
-                    alt="Preuve du travail" 
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-                
-                <div className="space-y-4 flex flex-col justify-center">
-                  <div className="bg-white/5 p-4 rounded-lg border border-white/10">
-                    <p className="text-xs text-stone-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <Calendar className="h-3 w-3" /> Date & Heure
-                    </p>
-                    <p className="font-mono text-sm text-emerald-300">
-                      {new Date(ticket.afterPhotoAt).toLocaleString('fr-FR', {
-                        day: '2-digit', month: '2-digit', year: 'numeric',
-                        hour: '2-digit', minute: '2-digit', second: '2-digit'
-                      })}
-                    </p>
-                  </div>
-                  
-                  <div className="bg-white/5 p-4 rounded-lg border border-white/10">
-                    <p className="text-xs text-stone-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <MapPin className="h-3 w-3" /> Coordonnées GPS
-                    </p>
-                    <p className="font-mono text-sm text-blue-300">Lat: {ticket.afterPhotoLat}</p>
-                    <p className="font-mono text-sm text-blue-300">Lng: {ticket.afterPhotoLng}</p>
-                    <a 
-                      href={`https://www.google.com/maps/search/?api=1&query=${ticket.afterPhotoLat},${ticket.afterPhotoLng}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs text-[#D4AF37] hover:underline mt-2 inline-block"
-                    >
-                      Ouvrir dans Google Maps ↗
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* 📸 Bloc 3: PREUVES DE TRAVAIL (P1-07). Photos privées, contrôles du serveur, décision du back-office. */}
+          <ProofsPanel ticket={ticket} onTicketChanged={() => loadTicketDetails(true)} />
         </div>
 
         {/* --- COLONNE DROITE (Actions / Artisan) --- */}
