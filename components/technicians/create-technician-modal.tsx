@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, X, Loader2, UserPlus } from "lucide-react";
 import api from "@/lib/api"; // Make sure this path matches your api helper!
+import { PasswordLinkDialog } from "@/components/password-link-dialog";
 
 interface CreateTechnicianModalProps {
   onSuccess: () => void;
@@ -12,6 +13,7 @@ export function CreateTechnicianModal({ onSuccess }: CreateTechnicianModalProps)
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [setupUrl, setSetupUrl] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -27,7 +29,12 @@ export function CreateTechnicianModal({ onSuccess }: CreateTechnicianModalProps)
 
     try {
       // 🚀 Calls the new secure NestJS endpoint we just made
-      await api.post("/users/artisans/create", formData);
+      const res = await api.post("/users/artisans/create", formData);
+
+      // E-mails are not sent yet: the API returns the one-time link instead.
+      if (res.data?.passwordSetupUrl) {
+        setSetupUrl(res.data.passwordSetupUrl);
+      }
       
       setIsOpen(false);
       setFormData({ name: "", email: "", phone: "", specialty: "Plombier" });
@@ -44,6 +51,10 @@ export function CreateTechnicianModal({ onSuccess }: CreateTechnicianModalProps)
 
   return (
     <>
+      {setupUrl && (
+        <PasswordLinkDialog url={setupUrl} onClose={() => setSetupUrl(null)} />
+      )}
+
       {/* 1. THE TRIGGER BUTTON */}
       <button 
         onClick={() => setIsOpen(true)}
@@ -153,7 +164,8 @@ export function CreateTechnicianModal({ onSuccess }: CreateTechnicianModalProps)
               
               {/* Info Note */}
               <p className="text-xs text-center text-stone-400 mt-2">
-                Le mot de passe par défaut sera : <strong className="text-stone-600">Artisan2026!</strong>
+                Le technicien reçoit par email un lien à usage unique (valable 24 h)
+                pour choisir son mot de passe.
               </p>
             </form>
 

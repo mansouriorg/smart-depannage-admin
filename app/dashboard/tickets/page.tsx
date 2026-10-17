@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Filter, Loader2, RefreshCcw } from "lucide-react";
-import api from "@/lib/api"; // ✅ Use your configured Axios helper
+import api, { unwrapList } from "@/lib/api"; // ✅ Use your configured Axios helper
 import { TicketTable } from "@/components/tickets/ticket-table";
 // ✅ IMPORT THE NEW MODAL
 import { CreateTicketModal } from "@/components/tickets/create-ticket-modal";
@@ -31,8 +31,9 @@ export default function TicketsPage() {
         api.get("/users/artisans") 
       ]);
 
-      setTickets(ticketsRes.data);
-      setArtisans(artisansRes.data);
+      // /users/artisans answers { data, meta }: unwrap it (P0-12)
+      setTickets(unwrapList<any>(ticketsRes.data));
+      setArtisans(unwrapList<any>(artisansRes.data));
     } catch (err: any) {
       console.error("Error fetching data:", err);
       setError("Impossible de charger les données.");

@@ -4,15 +4,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, Lock, Mail, Loader2, ArrowRight, AlertCircle } from "lucide-react";
-import api from "@/lib/api"; 
+import api from "@/lib/api";
+import { TOKEN_STORAGE_KEY } from "@/lib/config";
 
 export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   
-  // ✅ Pre-filled for Development
-  const [email, setEmail] = useState("admin@smart-depannage.com");
-  const [password, setPassword] = useState("password123");
+  // No pre-filled credentials: a default password in the screen is a default
+  // password in production.
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   async function handleLogin(e: React.FormEvent) {
@@ -24,15 +26,16 @@ export default function LoginPage() {
       // 1. 🚀 Call NestJS Login Endpoint
       const res = await api.post("/auth/login", { email, password });
 
-      // 2. 🛡️ Security Check: Ensure user is ADMIN
-      if (res.data.user.role !== 'ADMIN') {
+      // 2. 🛡️ Security Check: only the roles that can use every screen of this
+      // dashboard (dispatcher / support roles come with P1-12)
+      if (!['ADMIN', 'SUPER_ADMIN'].includes(res.data.user.role)) {
         setError("Accès refusé. Ce compte n'a pas les droits d'administration.");
         setIsLoading(false);
         return;
       }
 
       // 3. 💾 Save Token & Redirect
-      localStorage.setItem("adminToken", res.data.accessToken);
+      localStorage.setItem(TOKEN_STORAGE_KEY, res.data.accessToken);
       
       router.push("/dashboard"); 
       
@@ -40,6 +43,8 @@ export default function LoginPage() {
       console.error("Login failed:", err);
       if (err.response?.status === 401) {
         setError("Identifiants incorrects. Veuillez réessayer.");
+      } else if (err.response?.status === 429) {
+        setError("Trop de tentatives. Réessayez dans quelques minutes.");
       } else {
         setError("Impossible de se connecter au serveur. Vérifiez votre connexion.");
       }

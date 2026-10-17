@@ -77,7 +77,8 @@ export default function SettingsPage() {
         phone: formData.phone,
         address: formData.address,
         taxId: formData.taxId,
-        website: formData.website,
+        // An empty string is not a valid URL for the server: leave it out.
+        website: formData.website.trim() || undefined,
       });
       setSuccessMsg("Informations enregistrées avec succès !");
       setTimeout(() => setSuccessMsg(null), 4000);

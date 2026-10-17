@@ -14,7 +14,7 @@ import {
 import { clsx } from "clsx";
 import Link from "next/link";
 import api from "@/lib/api";
-import { io } from "socket.io-client";
+import { connectLiveSocket } from "@/lib/socket";
 
 // Types correspondant à la réponse de notre backend NestJS
 interface DashboardData {
@@ -56,11 +56,12 @@ export default function DashboardPage() {
     // 1. Chargement initial des données
     fetchDashboardStats();
 
-    // 2. 🔌 Connexion au WebSocket du Backend NestJS
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    const socket = io(backendUrl, {
-      transports: ['websocket'],
-    });
+    // 2. 🔌 Connexion au WebSocket du Backend NestJS (token obligatoire)
+    const socket = connectLiveSocket();
+
+    if (!socket) {
+      return;
+    }
 
     // 3. Écoute de l'événement "Nouvelle Intervention"
     socket.on('newIntervention', (intervention) => {

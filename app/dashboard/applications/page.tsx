@@ -16,6 +16,7 @@ import {
   X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PasswordLinkDialog } from "@/components/password-link-dialog";
 
 // Match the data shape from your Backend
 interface Application {
@@ -47,6 +48,7 @@ export default function ApplicationsPage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<number | null>(null);
+  const [setupUrl, setSetupUrl] = useState<string | null>(null);
 
   // UI States
   const [confirmModal, setConfirmModal] = useState<ConfirmState>({ isOpen: false, id: null, action: null });
@@ -89,7 +91,12 @@ export default function ApplicationsPage() {
     setConfirmModal({ isOpen: false, id: null, action: null });
 
     try {
-      await api.patch(`/artisan-applications/${id}/${action}`);
+      const res = await api.patch(`/artisan-applications/${id}/${action}`);
+
+      // E-mails are not sent yet: the API returns the one-time link instead.
+      if (action === "approve" && res.data?.passwordSetupUrl) {
+        setSetupUrl(res.data.passwordSetupUrl);
+      }
       
       // Update UI
       setApplications(prev => prev.map(app => 
@@ -115,6 +122,14 @@ export default function ApplicationsPage() {
 
   return (
     <div className="relative p-6 max-w-7xl mx-auto space-y-6">
+
+      {setupUrl && (
+        <PasswordLinkDialog
+          url={setupUrl}
+          title="Compte créé : lien pour l'artisan"
+          onClose={() => setSetupUrl(null)}
+        />
+      )}
       
       {/* Header */}
       <div className="flex items-center justify-between">

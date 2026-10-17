@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import api from "@/lib/api";
+import api, { unwrapList } from "@/lib/api";
 import { 
   Search, 
   MapPin, 
@@ -12,11 +12,13 @@ import {
   Loader2,
   Trash2, 
   Ban,
-  ExternalLink 
+  ExternalLink,
+  KeyRound
 } from "lucide-react";
 
 // ✅ 1. IMPORT THE NEW MODAL HERE
 import { CreateTechnicianModal } from "@/components/technicians/create-technician-modal";
+import { PasswordLinkDialog } from "@/components/password-link-dialog";
 
 interface Technician {
   id: number;
@@ -34,11 +36,13 @@ interface Technician {
 export default function TechniciansPage() {
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [loading, setLoading] = useState(true);
+  const [setupUrl, setSetupUrl] = useState<string | null>(null);
 
   const fetchTechnicians = async () => {
     try {
       const res = await api.get("/users/artisans");
-      setTechnicians(res.data);
+      // /users/artisans answers { data, meta }: unwrap it (P0-12)
+      setTechnicians(unwrapList<Technician>(res.data));
     } catch (err) {
       console.error("Failed to fetch technicians", err);
     } finally {
@@ -49,6 +53,21 @@ export default function TechniciansPage() {
   useEffect(() => {
     fetchTechnicians();
   }, []);
+
+  // New one-time "choose your password" link (the first one was lost or expired)
+  const handlePasswordLink = async (id: number) => {
+    try {
+      const res = await api.post(`/users/${id}/password-setup-link`);
+
+      if (res.data?.passwordSetupUrl) {
+        setSetupUrl(res.data.passwordSetupUrl);
+      } else {
+        alert(res.data?.message || "Un nouveau lien a été envoyé.");
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Impossible de créer le lien.");
+    }
+  };
 
   const handleDeactivate = async (id: number) => {
     if (!confirm("Êtes-vous sûr ?")) return;
@@ -77,6 +96,10 @@ export default function TechniciansPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+
+      {setupUrl && (
+        <PasswordLinkDialog url={setupUrl} onClose={() => setSetupUrl(null)} />
+      )}
       
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -116,6 +139,13 @@ export default function TechniciansPage() {
               }`}
             >
               
+              {/* NEW PASSWORD LINK */}
+              {tech.isActive && (
+                <button onClick={() => handlePasswordLink(tech.id)} className="absolute top-4 right-12 text-stone-300 hover:text-[#B69121] transition-colors p-1" title="Créer un nouveau lien de mot de passe">
+                  <KeyRound className="h-5 w-5" />
+                </button>
+              )}
+
               {/* DELETE BUTTON */}
               {tech.isActive && (
                 <button onClick={() => handleDeactivate(tech.id)} className="absolute top-4 right-4 text-stone-300 hover:text-red-500 transition-colors p-1" title="Désactiver le compte">

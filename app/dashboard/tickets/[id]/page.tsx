@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api"; 
+import { SERVER_URL } from "@/lib/config";
 import { clsx } from "clsx";
 
 export default function TicketDetailsPage() {
@@ -28,8 +29,9 @@ export default function TicketDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Configuration for images (Fallback to localhost if env var is missing)
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+  // Uploaded files are served from the backend host, NOT under the "/api"
+  // prefix that NEXT_PUBLIC_API_URL carries.
+  const backendUrl = SERVER_URL;
 
   useEffect(() => {
     if (ticketId) {
