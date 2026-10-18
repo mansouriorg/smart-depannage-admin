@@ -17,8 +17,8 @@ import {
   KeyRound
 } from "lucide-react";
 
-// ✅ 1. IMPORT THE NEW MODAL HERE
-import { CreateTechnicianModal } from "@/components/technicians/create-technician-modal";
+// The "Add technician" form is an invitation (P1-11)
+import { InviteTechnicianModal } from "@/components/technicians/invite-technician-modal";
 import { PasswordLinkDialog } from "@/components/password-link-dialog";
 
 interface Technician {
@@ -118,8 +118,7 @@ export default function TechniciansPage() {
              <input type="text" placeholder="Rechercher..." className="pl-9 pr-4 py-2.5 rounded-lg border border-stone-200 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 transition-all" />
            </div>
            
-           {/* ✅ 2. REPLACED THE OLD LINK WITH THE MODAL */}
-           <CreateTechnicianModal onSuccess={fetchTechnicians} />
+           <InviteTechnicianModal onSuccess={fetchTechnicians} />
         </div>
       </div>
 
