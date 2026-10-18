@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Plus, Loader2, Save, MapPin, FileText, Wrench, Phone } from "lucide-react";
 import api from "@/lib/api";
+import { TRADE_LIST } from "@/lib/shared";
 
 interface CreateTicketModalProps {
   onSuccess: () => void; // To refresh the table after creation
@@ -84,11 +85,11 @@ export function CreateTicketModal({ onSuccess }: CreateTicketModalProps) {
                 value={formData.serviceType}
                 onChange={(e) => setFormData({...formData, serviceType: e.target.value})}
               >
-                <option value="PLOMBIER">Plomberie</option>
-                <option value="ELECTRICIEN">Électricité</option>
-                <option value="SERRURIER">Serrurerie</option>
-                <option value="MENUISIER">Menuiserie</option>
-                <option value="AUTRE">Autre</option>
+                {TRADE_LIST.map((trade) => (
+                  <option key={trade.code} value={trade.code}>
+                    {trade.service}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

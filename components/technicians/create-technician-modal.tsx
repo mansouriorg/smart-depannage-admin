@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, X, Loader2, UserPlus } from "lucide-react";
 import api from "@/lib/api"; // Make sure this path matches your api helper!
 import { PasswordLinkDialog } from "@/components/password-link-dialog";
+import { TRADE_LIST } from "@/lib/shared";
 
 interface CreateTechnicianModalProps {
   onSuccess: () => void;
@@ -135,11 +136,12 @@ export function CreateTechnicianModal({ onSuccess }: CreateTechnicianModalProps)
                   onChange={(e) => setFormData({...formData, specialty: e.target.value})}
                   className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 bg-white"
                 >
-                  <option value="Plombier">Plombier</option>
-                  <option value="Électricien">Électricien</option>
-                  <option value="Serrurier">Serrurier</option>
-                  <option value="Menuisier">Menuisier</option>
-                  <option value="Polyvalent">Polyvalent</option>
+                  {/* The trades are the server's table (P1-10): a word it does not know is refused. */}
+                  {TRADE_LIST.map((trade) => (
+                    <option key={trade.code} value={trade.label}>
+                      {trade.code === "AUTRE" ? "Polyvalent" : trade.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
