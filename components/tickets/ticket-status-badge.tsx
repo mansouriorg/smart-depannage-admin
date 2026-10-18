@@ -8,6 +8,17 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { dashboardStatus } from "@/lib/ticket-status";
+import { statusLabel, statusTone, type StatusTone } from "@/lib/shared";
+
+// The statuses the dashboard has no look of its own for (P1-09): one look per tone.
+const TONE_LOOK: Record<StatusTone, { icon: typeof Clock; className: string }> = {
+  waiting: { icon: Clock, className: "bg-amber-50 text-amber-700 border-amber-200 ring-amber-500/10" },
+  info: { icon: User, className: "bg-sky-50 text-sky-700 border-sky-200 ring-sky-500/10" },
+  active: { icon: Clock, className: "bg-indigo-50 text-indigo-700 border-indigo-200 ring-indigo-500/10" },
+  success: { icon: CheckCircle2, className: "bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-500/10" },
+  warning: { icon: AlertCircle, className: "bg-orange-50 text-orange-700 border-orange-200 ring-orange-500/10" },
+  danger: { icon: XCircle, className: "bg-red-50 text-red-700 border-red-200 ring-red-500/10" },
+};
 
 interface TicketStatusBadgeProps {
   status: string;
@@ -70,11 +81,15 @@ export function TicketStatusBadge({ status }: TicketStatusBadgeProps) {
 
   // 2. 🛡️ SAFE GUARD: Fallback if status is unknown/undefined
   // This prevents the "Cannot destructure property label of undefined" error.
-  const statusConfig = config[dashboardStatus(status)] || {
-    label: status || "Inconnu",
-    icon: HelpCircle,
-    className: "bg-gray-100 text-gray-600 border-gray-200",
-  };
+  const tone = statusTone(status);
+  const statusConfig = config[dashboardStatus(status)] ||
+    (tone
+      ? { label: statusLabel(status), ...TONE_LOOK[tone] }
+      : {
+          label: status || "Inconnu",
+          icon: HelpCircle,
+          className: "bg-gray-100 text-gray-600 border-gray-200",
+        });
 
   const { label, icon: Icon, className } = statusConfig;
 

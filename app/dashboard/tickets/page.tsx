@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Filter, Loader2, RefreshCcw } from "lucide-react";
 import api, { unwrapList } from "@/lib/api"; // ✅ Use your configured Axios helper
+import { callApi, pageItems, routes } from "@/lib/shared";
 import { dashboardStatus } from "@/lib/ticket-status";
 import { TicketTable } from "@/components/tickets/ticket-table";
 // ✅ IMPORT THE NEW MODAL
@@ -29,13 +30,14 @@ export default function TicketsPage() {
       // 🚀 Parallel Fetch: Get Tickets AND Artisans at the same time
       const [ticketsRes, artisansRes] = await Promise.all([
         api.get("/interventions"),
-        // Only the artisans a job can be given to: approved and active (P1-05)
-        api.get("/users/artisans?assignable=true&limit=200")
+        // Only the artisans a job can be given to: approved and active (P1-05).
+        // The answer is a page ({ data, meta }): a screen that reads another shape does not compile (P1-09).
+        callApi((config) => api.request(config), routes.users.artisans<any>({ assignable: true, limit: 200 }))
       ]);
 
-      // /users/artisans answers { data, meta }: unwrap it (P0-12)
+      // /interventions still answers a bare list, or a page: unwrap it (P0-12)
       setTickets(unwrapList<any>(ticketsRes.data));
-      setArtisans(unwrapList<any>(artisansRes.data));
+      setArtisans(pageItems(artisansRes));
     } catch (err: any) {
       console.error("Error fetching data:", err);
       setError("Impossible de charger les données.");

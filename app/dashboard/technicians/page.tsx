@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import api, { unwrapList } from "@/lib/api";
+import api from "@/lib/api";
+import { callApi, pageItems, routes } from "@/lib/shared";
 import { 
   Search, 
   MapPin, 
@@ -40,9 +41,10 @@ export default function TechniciansPage() {
 
   const fetchTechnicians = async () => {
     try {
-      const res = await api.get("/users/artisans");
-      // /users/artisans answers { data, meta }: unwrap it (P0-12)
-      setTechnicians(unwrapList<Technician>(res.data));
+      // /users/artisans answers a page ({ data, meta }): a screen that reads another shape does not compile (P1-09)
+      const page = await callApi((config) => api.request(config), routes.users.artisans<Technician>());
+
+      setTechnicians(pageItems(page));
     } catch (err) {
       console.error("Failed to fetch technicians", err);
     } finally {

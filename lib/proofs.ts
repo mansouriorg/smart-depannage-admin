@@ -1,5 +1,6 @@
-import api, { unwrapList } from "@/lib/api";
+import api from "@/lib/api";
 import { SERVER_URL } from "@/lib/config";
+import { callApi, pageItems, routes } from "@/lib/shared";
 
 /**
  * Proofs of work (P1-07). The server judges every before/after photo (position, accuracy,
@@ -110,9 +111,10 @@ export function retainedProof(proofs: ProofRecord[], kind: ProofKind, photoUrl: 
 }
 
 export async function fetchProofs(interventionId: number | string): Promise<ProofRecord[]> {
-  const response = await api.get("/proofs", { params: { interventionId, take: 100 } });
+  // The answer is a page ({ data, meta }, paged by take and skip): a screen that reads another shape does not compile.
+  const page = await callApi((config) => api.request(config), routes.proofs.list<ProofRecord>({ interventionId, take: 100 }));
 
-  return unwrapList<ProofRecord>(response.data);
+  return pageItems(page);
 }
 
 export async function reviewProof(proofId: number, decision: "APPROVE" | "REJECT", note: string): Promise<void> {

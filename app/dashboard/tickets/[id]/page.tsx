@@ -17,6 +17,7 @@ import {
 import Link from "next/link";
 import api from "@/lib/api"; 
 import { dashboardStatus } from "@/lib/ticket-status";
+import { statusLabel } from "@/lib/shared";
 import { ProofsPanel } from "@/components/tickets/proofs-panel";
 import { clsx } from "clsx";
 
@@ -76,7 +77,7 @@ export default function TicketDetailsPage() {
       case "IN_PROGRESS": return "En cours";
       case "COMPLETED": return "Terminé";
       case "CANCELLED": return "Annulé";
-      default: return status;
+      default: return statusLabel(rawStatus, status);
     }
   };
 
