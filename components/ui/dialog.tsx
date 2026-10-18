@@ -7,6 +7,8 @@ import { X } from "lucide-react"; // Ensure you have lucide-react installed
 interface DialogContextProps {
   open: boolean;
   setOpen: (open: boolean) => void;
+  /** The id of the title, which names the dialog for screen readers. */
+  titleId: string;
 }
 
 const DialogContext = React.createContext<DialogContextProps | null>(null);
@@ -30,13 +32,14 @@ export function Dialog({ children, open, onOpenChange }: DialogProps) {
   // If no state is provided, we maintain internal state (uncontrolled).
   // If state is provided (controlled), we use that.
   const [internalOpen, setInternalOpen] = React.useState(false);
+  const titleId = React.useId();
   
   const isControlled = open !== undefined;
   const isOpen = isControlled ? open : internalOpen;
   const setIsOpen = isControlled ? onOpenChange : setInternalOpen;
 
   return (
-    <DialogContext.Provider value={{ open: !!isOpen, setOpen: setIsOpen || (() => {}) }}>
+    <DialogContext.Provider value={{ open: !!isOpen, setOpen: setIsOpen || (() => {}), titleId }}>
       {children}
     </DialogContext.Provider>
   );
@@ -86,9 +89,13 @@ interface DialogContentProps {
   className?: string;
 }
 
+/** What the Tab key can reach inside the dialog. */
+const FOCUSABLE = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export function DialogContent({ children, className = "" }: DialogContentProps) {
-  const { open, setOpen } = useDialog();
+  const { open, setOpen, titleId } = useDialog();
   const overlayRef = React.useRef<HTMLDivElement>(null);
+  const boxRef = React.useRef<HTMLDivElement>(null);
 
   // Handle Escape Key
   React.useEffect(() => {
@@ -98,6 +105,63 @@ export function DialogContent({ children, className = "" }: DialogContentProps) 
     if (open) window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open, setOpen]);
+
+  // Focus goes into the dialog when it opens (so a keyboard user does not have to cross the page
+  // behind it) and back to the button that opened it when it closes. When that button is gone (the
+  // row left the list: the job was assigned), it goes to the element the page marks as its fallback
+  // (data-dialog-fallback, the page title), not to nowhere.
+  React.useEffect(() => {
+    if (!open) return;
+
+    const before = document.activeElement as HTMLElement | null;
+
+    boxRef.current?.focus();
+
+    return () => {
+      const back = before && before !== document.body && before.isConnected && typeof before.focus === "function" ? before : null;
+
+      (back ?? document.querySelector<HTMLElement>("[data-dialog-fallback]"))?.focus();
+    };
+  }, [open]);
+
+  // Tab stays inside the dialog. The listener is on the document, not on the dialog: when the control
+  // that had the focus becomes disabled (the confirm button while it saves), the focus falls to the
+  // page and no key event reaches the dialog any more, but this one still does and brings it back.
+  React.useEffect(() => {
+    if (!open) return;
+
+    const keepFocusInside = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+
+      const box: HTMLDivElement | null = boxRef.current;
+
+      if (!box) return;
+
+      const items: HTMLElement[] = Array.from(box.querySelectorAll<HTMLElement>(FOCUSABLE));
+
+      if (items.length === 0) {
+        e.preventDefault();
+        box.focus();
+        return;
+      }
+
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+
+      if (!box.contains(active) || (e.shiftKey && (active === first || active === box))) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", keepFocusInside);
+
+    return () => document.removeEventListener("keydown", keepFocusInside);
+  }, [open]);
 
   // Handle Scroll Lock
   React.useEffect(() => {
@@ -128,8 +192,13 @@ export function DialogContent({ children, className = "" }: DialogContentProps) 
       />
       
       {/* Modal Box */}
-      <div 
-        className={`relative z-50 w-full rounded-lg border bg-white p-6 shadow-lg animate-in fade-in zoom-in-95 duration-200 sm:rounded-xl ${className}`}
+      <div
+        ref={boxRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className={`relative z-50 w-full rounded-lg border bg-white p-6 shadow-lg outline-none animate-in fade-in zoom-in-95 duration-200 sm:rounded-xl ${className}`}
       >
         {children}
         
@@ -139,7 +208,7 @@ export function DialogContent({ children, className = "" }: DialogContentProps) 
           className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-white transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:ring-offset-2 disabled:pointer-events-none"
         >
           <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">Fermer</span>
         </button>
       </div>
     </div>
@@ -157,8 +226,10 @@ export function DialogHeader({ className, children }: { className?: string; chil
 
 // 6. Title Wrapper
 export function DialogTitle({ className, children }: { className?: string; children: React.ReactNode }) {
+  const { titleId } = useDialog();
+
   return (
-    <h2 className={`text-lg font-semibold leading-none tracking-tight ${className || ""}`}>
+    <h2 id={titleId} className={`text-lg font-semibold leading-none tracking-tight ${className || ""}`}>
       {children}
     </h2>
   );
