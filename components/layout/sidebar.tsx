@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
@@ -10,46 +11,29 @@ import {
   ShieldCheck, 
   LogOut,
   FileText, // ✅ Icon for Applications
+  Loader2,
   Star // ✅ NEW: Icon for Feedbacks
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { logout } from "@/lib/auth";
+import { dashboardPagesFor, type PageId } from "@/lib/shared";
+import { useStaff } from "@/components/auth/staff-provider";
 
-const sidebarItems = [
-  { 
-    icon: LayoutDashboard, 
-    label: "Vue d'ensemble", 
-    href: "/dashboard" 
-  },
-  { 
-    icon: Ticket, 
-    label: "Interventions", 
-    href: "/dashboard/tickets" 
-  },
-  { 
-    icon: FileText, 
-    label: "Candidatures", 
-    href: "/dashboard/applications" 
-  },
-  { 
-    icon: Users, 
-    label: "Techniciens", 
-    href: "/dashboard/technicians" 
-  },
-  // ✅ NEW: Feedbacks Page
-  { 
-    icon: Star, 
-    label: "Avis & Retours", 
-    href: "/dashboard/feedbacks" 
-  },
-  { 
-    icon: Settings, 
-    label: "Paramètres", 
-    href: "/dashboard/settings" 
-  },
-];
+// The menu is the pages of the role (P1-12): the table lives in the server and comes with the shared package.
+const ICONS: Record<PageId, typeof LayoutDashboard> = {
+  overview: LayoutDashboard,
+  interventions: Ticket,
+  applications: FileText,
+  technicians: Users,
+  feedbacks: Star,
+  settings: Settings,
+};
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { ready, role } = useStaff();
+  const [leaving, setLeaving] = useState(false);
+  const items = ready ? dashboardPagesFor(role) : [];
 
   return (
     <aside className="w-64 bg-[#0f111a] border-r border-[#D4AF37]/20 flex flex-col fixed h-full z-20 shadow-2xl">
@@ -64,14 +48,15 @@ export function Sidebar() {
 
       {/* --- NAVIGATION --- */}
       <nav className="flex-1 py-6 px-3 space-y-1">
-        {sidebarItems.map((item) => {
-          const isActive = pathname === item.href;
-          const Icon = item.icon;
+        {items.map((item) => {
+          // The pages under a page (a ticket) keep their menu entry lit; the overview is only itself.
+          const isActive = pathname === item.path || (item.path !== "/dashboard" && pathname.startsWith(`${item.path}/`));
+          const Icon = ICONS[item.id];
 
           return (
             <Link
-              key={item.href}
-              href={item.href}
+              key={item.path}
+              href={item.path}
               className={cn(
                 "flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-300 group relative overflow-hidden",
                 isActive
@@ -99,9 +84,17 @@ export function Sidebar() {
 
       {/* --- FOOTER (Déconnexion) --- */}
       <div className="p-4 border-t border-[#D4AF37]/10 bg-[#0a0c12]">
-        <button className="flex items-center gap-2 text-stone-500 hover:text-red-400 hover:bg-red-900/10 text-sm font-medium w-full px-3 py-2.5 rounded-lg transition-all">
-          <LogOut className="h-4 w-4" /> 
-          <span>Déconnexion</span>
+        <button
+          type="button"
+          disabled={leaving}
+          onClick={() => {
+            setLeaving(true);
+            void logout();
+          }}
+          className="flex items-center gap-2 text-stone-500 hover:text-red-400 hover:bg-red-900/10 text-sm font-medium w-full px-3 py-2.5 rounded-lg transition-all disabled:opacity-60"
+        >
+          {leaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+          <span>{leaving ? "Déconnexion..." : "Déconnexion"}</span>
         </button>
       </div>
     </aside>

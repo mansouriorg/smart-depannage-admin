@@ -14,7 +14,17 @@ import {
 import { clsx } from "clsx";
 import Link from "next/link";
 import api from "@/lib/api";
+import { useStaff } from "@/components/auth/staff-provider";
 import { connectLiveSocket } from "@/lib/socket";
+import { canOpenDashboardPath } from "@/lib/shared";
+
+// The quick links of the right-hand card. Only the ones the signed-in role can open are shown (P1-12):
+// a link to a page that sends the person back here is worse than no link.
+const QUICK_LINKS = [
+  { href: "/dashboard/technicians", title: "Gérer les techniciens", hint: "Voir les artisans disponibles" },
+  { href: "/dashboard/feedbacks", title: "Avis & Retours", hint: "Traiter les signalements clients" },
+  { href: "/dashboard/applications", title: "Candidatures", hint: "Valider les nouveaux inscrits" },
+];
 
 // Types correspondant à la réponse de notre backend NestJS
 interface DashboardData {
@@ -36,6 +46,7 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
+  const { role } = useStaff();
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [liveAlert, setLiveAlert] = useState<string | null>(null); // État pour la notification bulle
@@ -222,20 +233,12 @@ export default function DashboardPage() {
           <p className="text-stone-400 text-sm mb-6">Gérez votre plateforme en un clic.</p>
 
           <div className="space-y-3">
-            <Link href="/dashboard/technicians" className="w-full block text-left px-4 py-3 rounded-lg bg-white/5 hover:bg-[#D4AF37]/20 border border-white/10 hover:border-[#D4AF37]/50 transition-all group">
-              <span className="block font-bold text-stone-200 group-hover:text-white">Gérer les techniciens</span>
-              <span className="text-xs text-stone-500 group-hover:text-[#F3DFA2]">Voir les artisans disponibles</span>
-            </Link>
-            
-            <Link href="/dashboard/feedbacks" className="w-full block text-left px-4 py-3 rounded-lg bg-white/5 hover:bg-[#D4AF37]/20 border border-white/10 hover:border-[#D4AF37]/50 transition-all group">
-              <span className="block font-bold text-stone-200 group-hover:text-white">Avis & Retours</span>
-              <span className="text-xs text-stone-500 group-hover:text-[#F3DFA2]">Traiter les signalements clients</span>
-            </Link>
-
-            <Link href="/dashboard/applications" className="w-full block text-left px-4 py-3 rounded-lg bg-white/5 hover:bg-[#D4AF37]/20 border border-white/10 hover:border-[#D4AF37]/50 transition-all group">
-              <span className="block font-bold text-stone-200 group-hover:text-white">Candidatures</span>
-              <span className="text-xs text-stone-500 group-hover:text-[#F3DFA2]">Valider les nouveaux inscrits</span>
-            </Link>
+            {QUICK_LINKS.filter((link) => canOpenDashboardPath(role, link.href)).map((link) => (
+              <Link key={link.href} href={link.href} className="w-full block text-left px-4 py-3 rounded-lg bg-white/5 hover:bg-[#D4AF37]/20 border border-white/10 hover:border-[#D4AF37]/50 transition-all group">
+                <span className="block font-bold text-stone-200 group-hover:text-white">{link.title}</span>
+                <span className="text-xs text-stone-500 group-hover:text-[#F3DFA2]">{link.hint}</span>
+              </Link>
+            ))}
           </div>
         </div>
 

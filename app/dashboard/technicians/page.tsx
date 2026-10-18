@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { callApi, pageItems, routes } from "@/lib/shared";
 import { 
-  Search, 
   MapPin, 
   Star, 
   Phone, 
@@ -20,6 +19,8 @@ import {
 // The "Add technician" form is an invitation (P1-11)
 import { InviteTechnicianModal } from "@/components/technicians/invite-technician-modal";
 import { PasswordLinkDialog } from "@/components/password-link-dialog";
+import { useStaff } from "@/components/auth/staff-provider";
+import { ratingLabel } from "@/lib/technicians";
 
 interface Technician {
   id: number;
@@ -32,9 +33,21 @@ interface Technician {
   latitude?: number;
   longitude?: number;
   location?: string; 
+  // The trade and the real rating of the profile (P1-12): GET /users/artisans carries them
+  artisanProfile?: { specialty?: string | null; averageRating?: number | null; ratingCount?: number | null } | null;
+  // What customers answered after the jobs of this artisan (the rating of the tracking link)
+  feedback?: { average?: number | null; count?: number | null } | null;
 }
 
+// The list is read in pages of this size, all of them: with no search box, a technician beyond the first page could not be reached.
+const PAGE_SIZE = 200;
+const MAX_PAGES = 10;
+
 export default function TechniciansPage() {
+  // A dispatcher or a support agent reads the list; inviting, switching off and sending a password link are for the administrators (the API refuses the others).
+  const { can } = useStaff();
+  const canInvite = can("inviteTechnician");
+  const canManage = can("manageTechnician");
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [loading, setLoading] = useState(true);
   const [setupUrl, setSetupUrl] = useState<string | null>(null);
@@ -42,9 +55,19 @@ export default function TechniciansPage() {
   const fetchTechnicians = async () => {
     try {
       // /users/artisans answers a page ({ data, meta }): a screen that reads another shape does not compile (P1-09)
-      const page = await callApi((config) => api.request(config), routes.users.artisans<Technician>());
+      const all: Technician[] = [];
+      let page = 1;
+      let pages = 1;
 
-      setTechnicians(pageItems(page));
+      do {
+        const answer = await callApi((config) => api.request(config), routes.users.artisans<Technician>({ page, limit: PAGE_SIZE }));
+
+        all.push(...pageItems(answer));
+        pages = answer?.meta?.totalPages ?? 1;
+        page += 1;
+      } while (page <= pages && page <= MAX_PAGES);
+
+      setTechnicians(all);
     } catch (err) {
       console.error("Failed to fetch technicians", err);
     } finally {
@@ -112,21 +135,18 @@ export default function TechniciansPage() {
           </p>
         </div>
         
-        <div className="flex gap-3">
-           <div className="relative">
-             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
-             <input type="text" placeholder="Rechercher..." className="pl-9 pr-4 py-2.5 rounded-lg border border-stone-200 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 transition-all" />
-           </div>
-           
-           <InviteTechnicianModal onSuccess={fetchTechnicians} />
-        </div>
+        {canInvite && (
+          <div className="flex gap-3">
+            <InviteTechnicianModal onSuccess={fetchTechnicians} />
+          </div>
+        )}
       </div>
 
       {/* GRID */}
       {technicians.length === 0 ? (
         <div className="text-center py-20 bg-stone-50 rounded-xl border border-stone-200 border-dashed">
-          <Loader2 className="h-10 w-10 text-stone-300 mx-auto mb-3 animate-spin" /> 
-          <p className="text-stone-400 text-sm">Chargement ou aucun technicien...</p>
+          <Wrench className="h-10 w-10 text-stone-300 mx-auto mb-3" /> 
+          <p className="text-stone-400 text-sm">Aucun technicien pour le moment.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -141,14 +161,14 @@ export default function TechniciansPage() {
             >
               
               {/* NEW PASSWORD LINK */}
-              {tech.isActive && (
+              {canManage && tech.isActive && (
                 <button onClick={() => handlePasswordLink(tech.id)} className="absolute top-4 right-12 text-stone-300 hover:text-[#B69121] transition-colors p-1" title="Créer un nouveau lien de mot de passe">
                   <KeyRound className="h-5 w-5" />
                 </button>
               )}
 
               {/* DELETE BUTTON */}
-              {tech.isActive && (
+              {canManage && tech.isActive && (
                 <button onClick={() => handleDeactivate(tech.id)} className="absolute top-4 right-4 text-stone-300 hover:text-red-500 transition-colors p-1" title="Désactiver le compte">
                   <Trash2 className="h-5 w-5" />
                 </button>
@@ -167,7 +187,7 @@ export default function TechniciansPage() {
                   <h3 className="font-bold text-lg text-blue-950 truncate max-w-[150px]">{tech.name}</h3>
                   <div className="flex items-center gap-1.5 text-sm text-[#B69121] font-medium">
                     <Wrench className="h-3.5 w-3.5" />
-                    {tech.specialty || "Technicien Polyvalent"}
+                    {tech.artisanProfile?.specialty || tech.specialty || "Technicien Polyvalent"}
                   </div>
                 </div>
               </div>
@@ -219,7 +239,7 @@ export default function TechniciansPage() {
                 
                 <div className="text-xs text-stone-400 font-medium flex items-center gap-1">
                   <Star className="h-3 w-3 text-[#D4AF37] fill-[#D4AF37]" />
-                  <span>5.0</span>
+                  <span>{ratingLabel(tech.artisanProfile, tech.feedback)}</span>
                 </div>
               </div>
 

@@ -19,3 +19,9 @@ export const SERVER_URL = API_URL.replace(/\/api$/, "");
 export const SOCKET_URL = SERVER_URL;
 
 export const TOKEN_STORAGE_KEY = "adminToken";
+
+/** The refresh token (7 days): it replaces the access token, silently, when this one expires (P1-12). */
+export const REFRESH_STORAGE_KEY = "adminRefreshToken";
+
+/** The signed-in account as the sign-in answered it (name, role): what the header and the menu show. */
+export const USER_STORAGE_KEY = "adminUser";

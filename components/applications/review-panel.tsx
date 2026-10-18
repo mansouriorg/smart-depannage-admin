@@ -7,6 +7,7 @@ import { fr } from "date-fns/locale";
 import { apiErrorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { DocumentViewer } from "@/components/applications/document-viewer";
+import { useStaff } from "@/components/auth/staff-provider";
 import {
   type Applicant,
   type ApprovalResult,
@@ -49,6 +50,9 @@ const STATUS_CLASS = {
  * with the written exception, like the server asks.
  */
 export function ReviewPanel({ applicant, onClose, onDecided, onChanged }: ReviewPanelProps) {
+  // Support checks the papers; accepting or refusing the application is for the administrators (P1-12: the API refuses the others).
+  const { can } = useStaff();
+  const canDecide = can("decideApplication");
   const [mode, setMode] = useState<Mode>("review");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -306,15 +310,22 @@ export function ReviewPanel({ applicant, onClose, onDecided, onChanged }: Review
 
           {mode === "review" && (
             <div className="flex flex-wrap justify-end gap-3">
+              {!canDecide && (
+                <p className="mr-auto self-center text-xs text-stone-500">
+                  Vous pouvez vérifier les documents. La décision (accepter ou refuser la candidature) revient à un administrateur.
+                </p>
+              )}
               <Button variant="outline" onClick={onClose}>Fermer</Button>
-              {applicant.verificationStatus === "PENDING_REVIEW" && (
+              {canDecide && applicant.verificationStatus === "PENDING_REVIEW" && (
                 <Button onClick={() => goTo("reject")} className="bg-red-600 hover:bg-red-700">
                   <XCircle className="mr-2 h-4 w-4" /> Refuser
                 </Button>
               )}
-              <Button onClick={() => goTo("approve")} className="bg-green-600 hover:bg-green-700">
-                <CheckCircle2 className="mr-2 h-4 w-4" /> Approuver
-              </Button>
+              {canDecide && (
+                <Button onClick={() => goTo("approve")} className="bg-green-600 hover:bg-green-700">
+                  <CheckCircle2 className="mr-2 h-4 w-4" /> Approuver
+                </Button>
+              )}
             </div>
           )}
 

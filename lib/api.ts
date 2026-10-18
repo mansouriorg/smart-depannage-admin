@@ -1,5 +1,7 @@
-import axios from "axios";
-import { API_URL, TOKEN_STORAGE_KEY } from "@/lib/config";
+import axios, { type InternalAxiosRequestConfig } from "axios";
+import { API_URL } from "@/lib/config";
+import { endSession, refreshSession } from "@/lib/auth";
+import { getAccessToken } from "@/lib/session";
 import { pageItems, type Paginated } from "@/lib/shared";
 
 // One sentence for a refused request: written once, in the shared package (P1-09).
@@ -14,32 +16,48 @@ const api = axios.create({
 
 // 🔒 Add the token to every request
 api.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+  const token = getAccessToken();
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
+
   return config;
 });
 
-// 🔒 The access token lives 15 minutes. When the server answers 401 on
-// anything but the login call, the session is over: clear it and go back to
-// the login page instead of leaving screens that silently stay empty.
-// (A silent refresh with the refresh token is planned in P1-12.)
+/** The calls that answer 401 for a reason of their own (a wrong password), and must not refresh anything. */
+const AUTH_CALL = /\/auth\/(login|refresh|logout)(\?|$)/;
+
+type Retryable = InternalAxiosRequestConfig & { _afterRefresh?: boolean };
+
+function tokenOf(config: InternalAxiosRequestConfig): string | null {
+  const header = String(config.headers?.Authorization ?? "");
+
+  return header.startsWith("Bearer ") ? header.slice("Bearer ".length) : null;
+}
+
+// 🔒 The access token lives 15 minutes (P1-12). When the server answers 401, the refresh token (7 days)
+// is exchanged for a new pair, once for all the calls that failed together, and the call is sent again.
+// The session is over, and the person goes back to the sign-in page, only when the server itself
+// refuses the refresh token; a server that cannot be reached leaves the person where they are.
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    const status = error?.response?.status;
-    const isLoginCall = error?.config?.url?.includes("/auth/login");
+  async (error) => {
+    const config = error?.config as Retryable | undefined;
 
-    if (status === 401 && !isLoginCall && typeof window !== "undefined") {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
+    if (error?.response?.status !== 401 || !config || typeof window === "undefined") return Promise.reject(error);
+    if (AUTH_CALL.test(config.url ?? "") || config._afterRefresh) return Promise.reject(error);
 
-      if (window.location.pathname !== "/") {
-        window.location.assign("/");
-      }
+    const outcome = await refreshSession(tokenOf(config));
+
+    if (outcome === "refreshed") {
+      config._afterRefresh = true;
+      config.headers.Authorization = `Bearer ${getAccessToken()}`;
+
+      return api.request(config);
     }
+
+    if (outcome === "expired") endSession();
 
     return Promise.reject(error);
   },

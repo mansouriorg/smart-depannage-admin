@@ -7,6 +7,7 @@ import {
   Phone,
   Eye // ✅ 1. Imported the Eye icon
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation"; // ✅ 2. Imported the Next.js router
 import { TicketStatusBadge } from "./ticket-status-badge";
 import { format } from "date-fns";
@@ -134,13 +135,15 @@ export function TicketTable({ data, artisans }: TicketTableProps) {
                     {/* ✅ 5. Wrap actions in a div that STOPS the click event so clicking buttons doesn't trigger the row navigation */}
                     <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                       
-                      {/* Visual indicator that the row has a details page */}
-                      <div 
-                        className="p-2 text-stone-400 group-hover:text-[#B69121] group-hover:bg-[#D4AF37]/10 rounded-lg transition-colors" 
+                      {/* A real link to the details page (it was an icon that did nothing: its wrapper stops the row's click) */}
+                      <Link
+                        href={`/dashboard/tickets/${ticket.id}`}
+                        className="p-2 text-stone-400 group-hover:text-[#B69121] group-hover:bg-[#D4AF37]/10 rounded-lg transition-colors"
                         title="Voir les détails du dossier"
+                        aria-label="Voir les détails du dossier"
                       >
                         <Eye className="h-4 w-4" />
-                      </div>
+                      </Link>
 
                       <TicketActions 
                         ticket={ticket} 
@@ -156,13 +159,9 @@ export function TicketTable({ data, artisans }: TicketTableProps) {
         </table>
       </div>
       
-      {/* Pagination Footer */}
+      {/* Footer: the list is whole (the server sends every request), so there are no pages to turn (P1-12) */}
       <div className="bg-stone-50 px-6 py-4 border-t border-stone-200 flex items-center justify-between text-xs text-stone-500 rounded-b-xl border-x border-b">
-          <span>{data.length} résultats affichés</span>
-          <div className="flex gap-2">
-            <button className="px-3 py-1 bg-white border border-stone-200 rounded text-stone-400 text-xs cursor-not-allowed" disabled>Précédent</button>
-            <button className="px-3 py-1 bg-white border border-stone-200 rounded text-stone-400 text-xs cursor-not-allowed" disabled>Suivant</button>
-          </div>
+          <span>{data.length === 1 ? "1 demande" : `${data.length} demandes`}</span>
       </div>
     </div>
   );

@@ -1,15 +1,43 @@
 // src/app/page.tsx
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { ShieldCheck, Lock, Mail, Loader2, ArrowRight, AlertCircle } from "lucide-react";
 import api from "@/lib/api";
-import { TOKEN_STORAGE_KEY } from "@/lib/config";
+import { cancelLogin } from "@/lib/auth";
+import { landingPath } from "@/lib/route-guard";
+import { clearSession, saveSession, sessionWasKept, toStaffUser } from "@/lib/session";
+import { staffRoleOf } from "@/lib/shared";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+
+  // "Oublié ?": the same form asks for the e-mail address only and sends the link of the reset page (the website's /reset-password).
+  const [forgotten, setForgotten] = useState(false);
+  const [info, setInfo] = useState("");
+
+  // Why the person is here, and where they were going: the address says (see proxy.ts and lib/api.ts).
+  const [expired, setExpired] = useState(false);
+  const [passwordChanged, setPasswordChanged] = useState(false);
+  const [next, setNext] = useState<string | null>(null);
+
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+
+    setNext(query.get("next"));
+
+    // The session ended: whatever the browser still holds of it is of no use, and a leftover must not bounce the person back.
+    if (query.get("reason") === "expired") {
+      setExpired(true);
+      clearSession();
+    }
+
+    // The password was changed from the settings: every session ended, this one too.
+    if (query.get("reason") === "password") {
+      setPasswordChanged(true);
+      clearSession();
+    }
+  }, []);
   
   // No pre-filled credentials: a default password in the screen is a default
   // password in production.
@@ -17,27 +45,66 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
+  async function sendResetLink() {
+    try {
+      const res = await api.post("/auth/forgot-password", { email });
+
+      setInfo(res.data?.message || "Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.");
+    } catch (err: any) {
+      setError(
+        err.response?.status === 429
+          ? "Trop de tentatives. Réessayez dans quelques minutes."
+          : err.response?.status === 400
+            ? "Saisissez une adresse e-mail valide."
+            : "Impossible de contacter le serveur. Vérifiez votre connexion.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setIsLoading(true);
     setError(""); 
+    setInfo("");
+
+    if (forgotten) {
+      await sendResetLink();
+      return;
+    }
 
     try {
       // 1. 🚀 Call NestJS Login Endpoint
       const res = await api.post("/auth/login", { email, password });
 
-      // 2. 🛡️ Security Check: only the roles that can use every screen of this
-      // dashboard (dispatcher / support roles come with P1-12)
-      if (!['ADMIN', 'SUPER_ADMIN'].includes(res.data.user.role)) {
-        setError("Accès refusé. Ce compte n'a pas les droits d'administration.");
+      // 2. 🛡️ Security Check: the back-office roles (admin, super admin, support, dispatcher, accountant).
+      // A customer or an artisan has no business here: the session the server just opened for them is cancelled.
+      const user = toStaffUser(res.data?.user);
+
+      if (!user || !staffRoleOf(user.role)) {
+        void cancelLogin(res.data?.refreshToken);
+        setError("Accès refusé. Ce compte n'a pas accès à l'espace de supervision.");
         setIsLoading(false);
         return;
       }
 
-      // 3. 💾 Save Token & Redirect
-      localStorage.setItem(TOKEN_STORAGE_KEY, res.data.accessToken);
-      
-      router.push("/dashboard"); 
+      // 3. 💾 Keep the session (both tokens, the account, the marker for the route guard) and go to the
+      // page where the person was headed, or the first page of their menu. A full load, so that
+      // the guard sees the cookie that has just been written.
+      const role = saveSession({ accessToken: res.data.accessToken, refreshToken: res.data.refreshToken, user });
+
+      // A browser that refuses storage or cookies would send the person to the dashboard and straight
+      // back here with no word: say it instead.
+      if (!sessionWasKept()) {
+        clearSession();
+        void cancelLogin(res.data?.refreshToken);
+        setError("Votre navigateur refuse de garder la session (stockage ou cookies bloqués). Autorisez-les pour ce site, puis réessayez.");
+        setIsLoading(false);
+        return;
+      }
+
+      window.location.assign(landingPath(role, next));
       
     } catch (err: any) {
       console.error("Login failed:", err);
@@ -98,10 +165,17 @@ export default function LoginPage() {
           </div>
 
           {/* Mot de passe */}
+          {!forgotten && (
           <div className="space-y-2">
             <div className="flex justify-between items-center ml-1">
               <label className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider">Mot de passe</label>
-              <a href="#" className="text-xs text-stone-500 hover:text-white transition-colors">Oublié ?</a>
+              <button
+                type="button"
+                onClick={() => { setForgotten(true); setError(""); setInfo(""); }}
+                className="text-xs text-stone-500 hover:text-white transition-colors"
+              >
+                Oublié ?
+              </button>
             </div>
             <div className="relative group">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 group-focus-within:text-[#D4AF37] transition-colors">
@@ -117,6 +191,31 @@ export default function LoginPage() {
               />
             </div>
           </div>
+          )}
+
+            {/* La session a pris fin (jeton refusé, compte désactivé) */}
+            {expired && !error && (
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex items-start gap-3 text-amber-300 text-sm">
+                <AlertCircle className="h-5 w-5 shrink-0" />
+                <span>Votre session a expiré. Reconnectez-vous pour continuer.</span>
+            </div>
+            )}
+
+            {/* Mot de passe modifié depuis les paramètres */}
+            {passwordChanged && !info && !error && (
+            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex items-start gap-3 text-green-400 text-sm">
+                <AlertCircle className="h-5 w-5 shrink-0" />
+                <span>Mot de passe modifié. Reconnectez-vous avec le nouveau.</span>
+            </div>
+            )}
+
+            {/* Lien de réinitialisation envoyé */}
+            {info && (
+            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex items-start gap-3 text-green-400 text-sm">
+                <AlertCircle className="h-5 w-5 shrink-0" />
+                <span>{info}</span>
+            </div>
+            )}
 
             {/* 🔴 MESSAGE D'ERREUR */}
             {error && (
@@ -134,14 +233,24 @@ export default function LoginPage() {
           >
             {isLoading ? (
               <>
-                <Loader2 className="h-5 w-5 animate-spin" /> Connexion...
+                <Loader2 className="h-5 w-5 animate-spin" /> {forgotten ? "Envoi..." : "Connexion..."}
               </>
             ) : (
               <>
-                Se connecter <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                {forgotten ? "Envoyer le lien" : "Se connecter"} <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
               </>
             )}
           </button>
+
+          {forgotten && (
+            <button
+              type="button"
+              onClick={() => { setForgotten(false); setError(""); setInfo(""); }}
+              className="w-full text-sm text-stone-400 hover:text-white transition-colors"
+            >
+              Retour à la connexion
+            </button>
+          )}
 
         </form>
 
