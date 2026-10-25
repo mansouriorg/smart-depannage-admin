@@ -22,7 +22,7 @@ import { canOpenDashboardPath } from "@/lib/shared";
 // a link to a page that sends the person back here is worse than no link.
 const QUICK_LINKS = [
   { href: "/dashboard/technicians", title: "Gérer les techniciens", hint: "Voir les artisans disponibles" },
-  { href: "/dashboard/feedbacks", title: "Avis & Retours", hint: "Traiter les signalements clients" },
+  { href: "/dashboard/feedbacks", title: "Avis & Retours", hint: "Modérer les avis des clients" },
   { href: "/dashboard/applications", title: "Candidatures", hint: "Valider les nouveaux inscrits" },
 ];
 

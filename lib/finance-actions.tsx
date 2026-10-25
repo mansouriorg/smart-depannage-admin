@@ -231,15 +231,30 @@ export function payoutPaidSpec(payout: PayoutRow, today: string): ActionSpec<unk
 export function refundDueSpec(row: RefundDueRow): ActionSpec<unknown> {
   const steps = refundPlan(row.due, row.payments);
   const numbers = row.creditNotes.map((note) => note.number).join(", ");
+  const claims = row.complaints.map((complaint) => `n° ${complaint.id}`).join(", ");
+  // What is given back is the larger of what the credit notes leave and what the accepted complaints leave: they are never added.
+  const fromBoth = row.fromCreditNotes > 0 && row.fromComplaints > 0;
+  // A credit note the invoice already covers is no reason for this refund: only what makes the job owe is named.
+  const because = [numbers && row.fromCreditNotes > 0 ? `Avoir ${numbers}` : "", claims ? `Réclamation ${claims}` : ""].filter(Boolean).join(" · ");
 
   return {
     key: `due-${row.interventionId}`,
     title: `Rembourser · mission n° ${row.interventionId}`,
     intro: (
       <>
-        <p>
-          {row.client?.name ?? "Le client"} a payé <strong>{moneyText(row.due)}</strong> de plus que ce qui est dû après {numbers ? `l’avoir ${numbers}` : "l’avoir"}.
-        </p>
+        {row.fromCreditNotes > 0 ? (
+          <p>
+            {row.client?.name ?? "Le client"} a payé <strong>{moneyText(row.fromCreditNotes)}</strong> de plus que ce qui est dû après {numbers ? `l’avoir ${numbers}` : "l’avoir"}.
+          </p>
+        ) : null}
+        {row.fromComplaints > 0 ? (
+          <p className={row.fromCreditNotes > 0 ? "mt-1" : undefined}>
+            {claims ? `Le remboursement accepté sur la réclamation ${claims}` : "Le remboursement accepté"} laisse <strong>{moneyText(row.fromComplaints)}</strong> à rendre à {row.client?.name ?? "le client"}.
+          </p>
+        ) : null}
+        {fromBoth ? (
+          <p className="mt-1 text-xs text-stone-500">Les deux ne s’additionnent pas : le même argent est rendu une seule fois, soit {moneyText(row.due)}.</p>
+        ) : null}
         {steps.length === 0 ? (
           <p className="mt-2 font-medium text-red-700">Aucun paiement de cette mission ne peut plus être remboursé.</p>
         ) : (
@@ -253,7 +268,7 @@ export function refundDueSpec(row: RefundDueRow): ActionSpec<unknown> {
         )}
       </>
     ),
-    fields: [{ id: "reason", label: "Motif", kind: "textarea", required: true, maxLength: PAYMENT_REASON_MAX, initial: numbers ? `Avoir ${numbers}` : "", help: "Gardé sur chaque paiement remboursé." }],
+    fields: [{ id: "reason", label: "Motif", kind: "textarea", required: true, maxLength: PAYMENT_REASON_MAX, initial: because, help: "Gardé sur chaque paiement remboursé." }],
     submitLabel: steps.length > 1 ? `Rembourser en ${steps.length} fois` : "Rembourser",
     danger: true,
     check: (values) => {

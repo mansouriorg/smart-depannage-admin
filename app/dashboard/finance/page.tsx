@@ -100,7 +100,7 @@ function Summary({ summary, busy, error, reload, linkTo }: { summary: FinanceSum
             value={summary.refundsDue.count}
             tone={summary.refundsDue.count > 0 ? "warning" : "plain"}
             href={toTab(`${BASE}/refunds`)}
-            hint={summary.refundsDue.count > 0 ? `${money(summary.refundsDue.amount)} à rendre aux clients` : "Aucun avoir à rembourser"}
+            hint={summary.refundsDue.count > 0 ? `${money(summary.refundsDue.amount)} à rendre aux clients` : "Aucun remboursement à faire"}
           />
           <Stat
             label="Factures impayées"

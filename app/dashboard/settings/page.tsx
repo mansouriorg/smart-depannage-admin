@@ -1,15 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { 
-  Building, 
+  User, 
   Lock, 
   Save, 
   Loader2,
   Mail,
   Phone,
   MapPin,
-  Globe,
   CheckCircle2,
   AlertCircle
 } from "lucide-react";
@@ -20,13 +20,14 @@ import { leaveAfterPasswordChange } from "@/lib/auth";
 import { passwordFormProblem } from "@/lib/password";
 import { toStaffUser } from "@/lib/session";
 import { displayName, frenchDate, initialOf } from "@/lib/staff-display";
-import { staffRoleLabel } from "@/lib/shared";
+import { canOpenDashboardPath, staffRoleLabel } from "@/lib/shared";
 import { useStaff } from "@/components/auth/staff-provider";
 
 export default function SettingsPage() {
   // Whose profile this is (P1-12): the signed-in account, as the server describes it. Every staff role has one.
+  // The company (its name, its address, its tax numbers) is not a field of this account: it is set in "Entreprise" (P2-09).
   const { user, role, update } = useStaff();
-  const isCompanyAccount = role === "ADMIN" || role === "SUPER_ADMIN";
+  const companyPage = canOpenDashboardPath(role, "/dashboard/company");
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -42,8 +43,6 @@ export default function SettingsPage() {
     email: "",
     phone: "",
     address: "",
-    taxId: "",   
-    website: "", 
   });
   const [passwordChangedAt, setPasswordChangedAt] = useState<string | null>(null);
 
@@ -57,8 +56,6 @@ export default function SettingsPage() {
           email: response.data.email || "",
           phone: response.data.phone || "",
           address: response.data.address || "",
-          taxId: response.data.taxId || "",
-          website: response.data.website || "",
         });
         setPasswordChangedAt(response.data.passwordChangedAt ?? null);
       } catch (error) {
@@ -86,14 +83,6 @@ export default function SettingsPage() {
       const response = await api.patch('/users/profile', {
         name: formData.name,
         address: formData.address,
-        // The company fields belong to the administrators' accounts.
-        ...(isCompanyAccount
-          ? {
-              taxId: formData.taxId,
-              // An empty string is not a valid URL for the server: leave it out.
-              website: formData.website.trim() || undefined,
-            }
-          : {}),
       });
 
       // The header and the menu follow the new name at once.
@@ -197,7 +186,7 @@ export default function SettingsPage() {
             {/* ✅ Menu de navigation interactif */}
             <nav className="flex flex-col space-y-1">
               <MenuLink 
-                icon={Building} 
+                icon={User} 
                 label="Mon profil" 
                 active={activeTab === "profile"} 
                 onClick={() => scrollToSection("profile")}
@@ -218,31 +207,22 @@ export default function SettingsPage() {
           {/* 1. MON PROFIL ✅ id="profile" et scroll-mt-24 */}
           <div id="profile" className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden scroll-mt-24">
             <div className="bg-stone-50/50 px-6 py-4 border-b border-stone-100 flex items-center gap-3">
-              <Building className="h-5 w-5 text-[#B69121]" />
-              <h3 className="font-bold text-blue-950">{isCompanyAccount ? "Informations Entreprise" : "Mes informations"}</h3>
+              <User className="h-5 w-5 text-[#B69121]" />
+              <h3 className="font-bold text-blue-950">Mes informations</h3>
             </div>
             
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InputGroup 
-                  label={isCompanyAccount ? "Nom de la société" : "Nom"} 
+                  label="Nom" 
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
-                  placeholder={isCompanyAccount ? "Smart-Dépannage SARL" : "Votre nom"} 
+                  placeholder="Votre nom" 
                 />
-                {isCompanyAccount && (
-                  <InputGroup 
-                    label="Matricule Fiscale" 
-                    name="taxId"
-                    value={formData.taxId}
-                    onChange={handleChange}
-                    placeholder="1234567/A/M/000" 
-                  />
-                )}
               </div>
               <InputGroup 
-                label={isCompanyAccount ? "Adresse du siège" : "Adresse"} 
+                label="Adresse" 
                 name="address"
                 value={formData.address}
                 onChange={handleChange}
@@ -269,15 +249,14 @@ export default function SettingsPage() {
               <p className="text-xs text-stone-400">
                 L'email et le téléphone servent à retrouver votre compte : ils ne se modifient pas ici.
               </p>
-              {isCompanyAccount && (
-                <InputGroup 
-                  label="Site Web" 
-                  name="website"
-                  value={formData.website}
-                  onChange={handleChange}
-                  placeholder="https://www.smart-depannage.tn" 
-                  icon={Globe} 
-                />
+              {companyPage && (
+                <p className="text-xs text-stone-500">
+                  Le nom, l'adresse et les numéros fiscaux de l'entreprise, ceux que les factures impriment, se règlent dans{" "}
+                  <Link href="/dashboard/company" className="font-medium text-blue-900 underline underline-offset-2">
+                    Entreprise
+                  </Link>
+                  .
+                </p>
               )}
             </div>
           </div>

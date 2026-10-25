@@ -57,24 +57,30 @@ const DATE_WORDS: Record<PaymentView, string> = {
   refunded: "Un paiement est classé au jour de son dernier remboursement, pour son montant remboursé en entier.",
 };
 
+/** The last number the database holds in a column of whole numbers. */
+const MAX_JOB_NUMBER = 2_147_483_647;
+
 export default function FinancePaymentsPage() {
   const { get, update, problem, listPeriod, linkTo } = useFinanceParams();
   const { reloadSummary } = useFinance();
   const view = viewOf(get("view"));
   const method = get("method");
   const search = get("search");
+  // The payments of one job (the complaint screen links to them): the number of the job, whatever the date.
+  const jobText = get("job");
+  const job = /^[1-9]\d{0,9}$/.test(jobText) && Number(jobText) <= MAX_JOB_NUMBER ? Number(jobText) : null;
   const sort = get("sort") === "newest" || get("sort") === "oldest" ? get("sort") : "";
   const page = Math.max(1, Number.parseInt(get("page"), 10) || 1);
 
   // The search box follows the address, and the address follows the box a moment after the last key.
   const [typed, setTyped] = useSearchBox(search, update);
 
-  // A search looks at every date: finding one payment by its reference does not depend on the week.
-  const period = search ? {} : listPeriod;
+  // A search looks at every date: finding one payment by its reference does not depend on the week. Neither does a job.
+  const period = search || job !== null ? {} : listPeriod;
 
   const query = useMemo(
-    () => ({ ...period, view, method: method || undefined, search: search || undefined, sort: (sort || undefined) as "newest" | "oldest" | undefined, page: page > 1 ? page : undefined }),
-    [period, view, method, search, sort, page],
+    () => ({ ...period, view, method: method || undefined, search: search || undefined, interventionId: job ?? undefined, sort: (sort || undefined) as "newest" | "oldest" | undefined, page: page > 1 ? page : undefined }),
+    [period, view, method, search, job, sort, page],
   );
   const key = JSON.stringify(query) + problem;
   const { data, error, busy, reload } = useFinanceData(() => (problem ? Promise.resolve(null) : callApi((config) => api.request(config), routes.finance.payments(query))), key, "Impossible de charger les paiements.");
@@ -149,17 +155,33 @@ export default function FinancePaymentsPage() {
             <option value="">{view === "awaiting" ? "Les plus anciens d’abord" : "Les plus récents d’abord"}</option>
             <option value={view === "awaiting" ? "newest" : "oldest"}>{view === "awaiting" ? "Les plus récents d’abord" : "Les plus anciens d’abord"}</option>
           </select>
-          <DownloadButton route={routes.finance.exportPayments({ ...period, view, method: method || undefined, search: search || undefined })} fallbackName={`paiements-${view}.csv`}>
+          <DownloadButton route={routes.finance.exportPayments({ ...period, view, method: method || undefined, search: search || undefined, interventionId: job ?? undefined })} fallbackName={`paiements-${view}.csv`}>
             Exporter en CSV
           </DownloadButton>
         </div>
       </div>
 
+      {job !== null && (
+        <Notice>
+          <span data-testid="payments-job">Paiements de la mission n° {job} seulement, quelle que soit leur date.</span>{" "}
+          <button type="button" onClick={() => update({ job: undefined })} className="font-medium text-blue-900 underline underline-offset-2">
+            Voir tous les paiements
+          </button>
+        </Notice>
+      )}
+      {jobText !== "" && job === null && (
+        <Notice tone="warning">
+          <span data-testid="payments-job-bad">« {jobText} » n’est pas un numéro de mission : il est ignoré.</span>{" "}
+          <button type="button" onClick={() => update({ job: undefined })} className="font-medium text-blue-900 underline underline-offset-2">
+            Retirer
+          </button>
+        </Notice>
+      )}
       {view === "awaiting" ? (
         <Notice>Les paiements à confirmer s’affichent quelle que soit la date où ils ont été demandés : un paiement qui attend doit être traité.</Notice>
       ) : search ? (
         <Notice>La recherche porte sur toutes les dates, quelle que soit la période choisie ci-dessus.</Notice>
-      ) : (
+      ) : job !== null ? null : (
         <Notice>{DATE_WORDS[view]}</Notice>
       )}
 

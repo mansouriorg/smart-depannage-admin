@@ -195,6 +195,11 @@ function InvoiceLine({ invoice, locked, onCredit }: { invoice: InvoiceRow; locke
         <p className="font-semibold text-blue-950">{invoice.number}</p>
         <MissionLink id={invoice.interventionId}>Mission n° {invoice.interventionId}</MissionLink>
         <p className="mt-0.5 text-xs text-stone-500">Émise le {momentText(invoice.issuedAt) ?? "—"}</p>
+        {invoice.mentionsConfirmed === false && (
+          <p data-testid="mentions-unconfirmed" className="mt-0.5 text-xs text-amber-800">
+            Mentions non confirmées
+          </p>
+        )}
         <div className="mt-1">
           <DownloadButton compact route={routes.finance.invoicePdf(invoice.id)} fallbackName={`${invoice.number}.pdf`} label={`PDF de la facture ${invoice.number}`}>
             PDF

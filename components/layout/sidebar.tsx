@@ -13,7 +13,9 @@ import {
   FileText, // ✅ Icon for Applications
   Loader2,
   Star, // ✅ NEW: Icon for Feedbacks
-  Wallet // ✅ Icon for Finance (P2-08)
+  Wallet, // ✅ Icon for Finance (P2-08)
+  MessageSquareWarning, // Icon for the complaints (P2-09)
+  Building2 // Icon for the company (P2-09)
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logout } from "@/lib/auth";
@@ -28,6 +30,8 @@ const ICONS: Record<PageId, typeof LayoutDashboard> = {
   technicians: Users,
   feedbacks: Star,
   finance: Wallet,
+  complaints: MessageSquareWarning,
+  company: Building2,
   settings: Settings,
 };
 

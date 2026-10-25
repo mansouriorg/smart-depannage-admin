@@ -10,13 +10,17 @@ import { cn } from "@/lib/utils";
 export interface ActionField {
   id: string;
   label: string;
-  kind: "text" | "textarea" | "amount" | "date";
+  /** `select`: one of `options`. `checkbox`: the value is "true" when ticked, "" when not (P2-09). */
+  kind: "text" | "textarea" | "amount" | "date" | "select" | "checkbox";
+  options?: ReadonlyArray<{ value: string; label: string }>;
   placeholder?: string;
   help?: string;
   initial?: string;
   maxLength?: number;
   /** Shown next to the label: "obligatoire" or "facultatif". */
   required?: boolean;
+  /** Replaces those words when a field is needed only for one choice of the form ("obligatoire pour rejeter"). */
+  requirement?: string;
 }
 
 /**
@@ -157,14 +161,51 @@ function ActionForm<Value>({ spec, sending, onClose, onDone, onRefused }: { spec
             className: "w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#D4AF37]/50 disabled:bg-stone-50",
           };
 
+          if (field.kind === "checkbox") {
+            return (
+              <div key={field.id} className="space-y-1.5">
+                <label htmlFor={id} className="flex items-start gap-2 text-sm text-stone-700">
+                  <input
+                    id={id}
+                    type="checkbox"
+                    checked={values[field.id] === "true"}
+                    disabled={saving || locked}
+                    aria-describedby={field.help ? `${id}-help` : undefined}
+                    onChange={(event) => {
+                      setValues((current) => ({ ...current, [field.id]: event.target.checked ? "true" : "" }));
+                      setError(null);
+                    }}
+                    className="mt-0.5 h-4 w-4 rounded border-stone-300"
+                  />
+                  <span>{field.label}</span>
+                </label>
+                {field.help && (
+                  <p id={`${id}-help`} className="pl-6 text-xs text-stone-500">
+                    {field.help}
+                  </p>
+                )}
+              </div>
+            );
+          }
+
           return (
             <div key={field.id} className="space-y-1.5">
               <label htmlFor={id} className="flex items-center justify-between text-xs font-bold uppercase text-stone-500">
                 <span>{field.label}</span>
-                <span className="font-medium normal-case text-stone-400">{field.required ? "obligatoire" : "facultatif"}</span>
+                <span className="font-medium normal-case text-stone-400">{field.requirement ?? (field.required ? "obligatoire" : "facultatif")}</span>
               </label>
               {field.kind === "textarea" ? (
                 <textarea rows={3} {...common} className={cn(common.className, "resize-none")} />
+              ) : field.kind === "select" ? (
+                <select {...common} className={cn(common.className, "bg-white")}>
+                  {!field.required && <option value="">—</option>}
+                  {field.required && (values[field.id] ?? "") === "" && <option value="">Choisir…</option>}
+                  {(field.options ?? []).map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               ) : (
                 <input type={field.kind === "date" ? "date" : "text"} inputMode={field.kind === "amount" ? "decimal" : undefined} autoComplete="off" {...common} />
               )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import api from "@/lib/api";
 import { callApi, moneyText, momentText, paymentMethodLabel, routes, type RefundDueRow } from "@/lib/shared";
 import { refundDueSpec } from "@/lib/finance-actions";
@@ -12,8 +13,9 @@ import { Empty, ErrorBox, Loading, Notice, Stat } from "@/components/finance/ui"
 import { cn } from "@/lib/utils";
 
 /**
- * The money to give back: the customer has paid more than the invoice now asks, after a credit note. This list does not depend on
- * the period: a refund that is owed stays owed until it is made.
+ * The money to give back: the customer has paid more than the invoice now asks, after a credit note, or a refund accepted on one of
+ * their complaints (P2-09) has not all gone back. This list does not depend on the period: a refund that is owed stays owed until it
+ * is made.
  */
 export default function FinanceRefundsPage() {
   const { reloadSummary } = useFinance();
@@ -35,7 +37,9 @@ export default function FinanceRefundsPage() {
 
   return (
     <div className="space-y-4">
-      <Notice>Un avoir réduit ce que le client doit. S’il avait déjà payé plus, l’écart est à lui rendre : il apparaît ici jusqu’à ce que le remboursement soit fait, quelle que soit la date de l’avoir.</Notice>
+      <Notice>
+        Un avoir réduit ce que le client doit. S’il avait déjà payé plus, l’écart est à lui rendre. Un remboursement accepté sur une réclamation y figure aussi. Chaque ligne reste ici jusqu’à ce que le remboursement soit fait, quelle que soit la date de l’avoir ou de la décision.
+      </Notice>
 
       {done && <Notice>{done}</Notice>}
       {error && <ErrorBox message={error} onRetry={reload} />}
@@ -50,7 +54,7 @@ export default function FinanceRefundsPage() {
           </div>
 
           {data.items.length === 0 ? (
-            <Empty>Aucun remboursement à faire : aucun client n’a payé plus que ce qui lui est demandé.</Empty>
+            <Empty>Aucun remboursement à faire : aucun client n’a payé plus que ce qui lui est demandé, et aucun remboursement accepté sur une réclamation n’attend.</Empty>
           ) : (
             <section className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
               <div className="overflow-x-auto">
@@ -59,7 +63,7 @@ export default function FinanceRefundsPage() {
                     <tr>
                       <th className="px-4 py-3">Mission</th>
                       <th className="px-4 py-3">Client</th>
-                      <th className="px-4 py-3">Avoirs</th>
+                      <th className="px-4 py-3">Origine</th>
                       <th className="px-4 py-3 text-right">Gardé</th>
                       <th className="px-4 py-3 text-right">Dû</th>
                       <th className="px-4 py-3 text-right">À rendre</th>
@@ -85,7 +89,17 @@ export default function FinanceRefundsPage() {
                           <ul className="space-y-0.5">
                             {row.creditNotes.map((note) => (
                               <li key={note.id}>
-                                <span className="font-semibold text-stone-700">{note.number}</span> · {moneyText(note.amount)}
+                                Avoir <span className="font-semibold text-stone-700">{note.number}</span> · {moneyText(note.amount)}
+                              </li>
+                            ))}
+                            {row.complaints.map((complaint) => (
+                              <li key={`complaint-${complaint.id}`}>
+                                <Link href={`/dashboard/complaints/${complaint.id}`} className="font-semibold text-blue-900 underline-offset-2 hover:underline">
+                                  Réclamation n° {complaint.id}
+                                </Link>{" "}
+                                · accepté {moneyText(complaint.accepted)}
+                                {complaint.remaining < complaint.accepted ? `, reste ${moneyText(complaint.remaining)}` : ""}
+                                {complaint.decidedAt && <span className="block text-stone-500">décidé le {momentText(complaint.decidedAt)}</span>}
                               </li>
                             ))}
                           </ul>
