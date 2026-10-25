@@ -12,7 +12,8 @@ import {
   LogOut,
   FileText, // ✅ Icon for Applications
   Loader2,
-  Star // ✅ NEW: Icon for Feedbacks
+  Star, // ✅ NEW: Icon for Feedbacks
+  Wallet // ✅ Icon for Finance (P2-08)
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logout } from "@/lib/auth";
@@ -26,6 +27,7 @@ const ICONS: Record<PageId, typeof LayoutDashboard> = {
   applications: FileText,
   technicians: Users,
   feedbacks: Star,
+  finance: Wallet,
   settings: Settings,
 };
 
