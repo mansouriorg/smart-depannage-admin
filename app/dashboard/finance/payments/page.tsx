@@ -237,11 +237,11 @@ export default function FinancePaymentsPage() {
       <ActionDialog
         spec={spec}
         onClose={() => setSpec(null)}
-        onDone={() => {
+        onDone={(outcome) => {
           const action = spec?.title ?? "";
 
           setSpec(null);
-          setDone(`${action} : c’est fait.`);
+          setDone(outcome ? `${action} : ${outcome}` : `${action} : c’est fait.`);
           refresh();
         }}
         onRefused={refresh}

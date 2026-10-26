@@ -38,7 +38,7 @@ export class ActionFailure extends Error {
 
 /** What the person reads when the answer to a call that cannot be repeated never came. */
 /** The words of a lost answer on a call that can be sent again: the form stays open and the button works. */
-export const ANSWER_LOST_SAFE = "La réponse du serveur n’est pas arrivée : l’opération a peut-être été faite. Vous pouvez la renvoyer sans risque ; si elle est déjà faite, le serveur le dira. La liste est rechargée.";
+export const ANSWER_LOST_SAFE = "La réponse du serveur n’est pas arrivée : l’opération a peut-être été faite. Vous pouvez la renvoyer sans risque, sans rien changer ; si elle est déjà faite, le serveur le dira. La liste est rechargée.";
 
 export const ANSWER_LOST = "La réponse du serveur n’est pas arrivée : l’opération a peut-être été faite. La liste est rechargée : vérifiez-la avant de recommencer.";
 
@@ -54,21 +54,22 @@ export interface ActionSpec<Value> {
   danger?: boolean;
   /**
    * Whether sending it again after an answer that never came is harmless: the server answers a repeat as it answered the first
-   * call, or refuses it with a sentence that says so (cancelling a payment that is already cancelled). A refund is not: the server
-   * takes the same amount twice. When it is not harmless, the form is locked after such an answer.
+   * call, or refuses it with a sentence that says so (cancelling a payment that is already cancelled). A refund is harmless only
+   * when it goes with a key (P2-10): without one the server takes the same amount twice. When it is not harmless, the form is locked
+   * after such an answer.
    */
   retrySafe?: boolean;
   /** What was typed, checked: the value to send, or the sentence that says what is wrong. */
   check: (values: Record<string, string>) => { ok: true; value: Value } | { ok: false; message: string };
-  /** The call. A refusal of the server is shown in the form and the form stays open. */
-  run: (value: Value) => Promise<void>;
+  /** The call. A refusal of the server is shown in the form and the form stays open. It may answer with a sentence that says what came of it (what the provider said). */
+  run: (value: Value) => Promise<void | string>;
 }
 
 interface ActionDialogProps<Value> {
   spec: ActionSpec<Value> | null;
   onClose: () => void;
-  /** The call went through. */
-  onDone: () => void;
+  /** The call went through; `outcome` is what it said came of it, when it said. */
+  onDone: (outcome?: string) => void;
   /** The server refused: the lists are loaded again so that they tell the truth about what moved meanwhile. */
   onRefused?: () => void;
 }
@@ -113,9 +114,9 @@ function ActionForm<Value>({ spec, sending, onClose, onDone, onRefused }: { spec
     setError(null);
 
     try {
-      await spec.run(checked.value);
+      const outcome = await spec.run(checked.value);
 
-      onDone();
+      onDone(typeof outcome === "string" ? outcome : undefined);
     } catch (failure) {
       // An answer that never came, or a server that failed, on a call that cannot be repeated: it may have gone through.
       const lost = !(failure instanceof ActionFailure) && outcomeIsUnknown(failure) && spec.retrySafe !== true;

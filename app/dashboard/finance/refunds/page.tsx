@@ -143,9 +143,9 @@ export default function FinanceRefundsPage() {
       <ActionDialog
         spec={spec}
         onClose={() => setOpened(null)}
-        onDone={() => {
+        onDone={(outcome) => {
           setOpened(null);
-          setDone("Le remboursement est fait.");
+          setDone(outcome ?? "Le remboursement est fait.");
           refresh();
         }}
         onRefused={refresh}

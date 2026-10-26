@@ -1,12 +1,15 @@
 import api, { apiErrorMessage } from "@/lib/api";
 import {
+  CARD_MONEY_WORDS,
   CREDIT_REASON_MAX,
   NOTE_MAX,
   PAYMENT_ACTION_LABELS,
   PAYMENT_REASON_MAX,
+  REFUND_REPLAYED_WORDS,
   CONFIRM_REFERENCE_MAX,
   REMITTANCE_REFERENCE_MAX,
   callApi,
+  checkOutcomeWords,
   keyFor,
   moneyText,
   newRequestKey,
@@ -15,11 +18,14 @@ import {
   readCreditNote,
   readPayoutPaid,
   readReason,
+  isManualMethod,
+  isMoneyAtProvider,
   readRefundAmount,
   outcomeIsUnknown,
   readRemittance,
   refundPlan,
   routes,
+  spendKey,
   type ArtisanBalance,
   type CollectAttempts,
   type InvoiceRow,
@@ -37,6 +43,112 @@ const SEND_TIMEOUT_MS = 30_000;
 const send = <Answer,>(spec: RouteSpec<Answer>) => callApi((config) => api.request({ ...config, timeout: SEND_TIMEOUT_MS }), spec);
 
 const who = (payment: Pick<PaymentRow, "client" | "interventionId">) => payment.client?.name ?? `la mission n° ${payment.interventionId}`;
+
+/**
+ * The keys of the refunds that were sent and not answered, by payment. They outlive the form: a person who closes it after a lost
+ * answer and opens it again to type the same amount sends the same key, so the server makes one refund (P2-10). That holds even
+ * if the first try did go through and what can be given back is lower now: the server answers the first refund again, and money is
+ * never given back twice by a second tap. A different amount (the form proposes what is left) is a new refund with a key of its own.
+ */
+let refundTries: Map<number, CollectAttempts> | null = null;
+/** When each payment's keys were last used, so that a key from long ago does not stand in for a new decision. */
+const refundStamps = new Map<number, number>();
+
+/** A key stays good for an hour: longer than any retry after a lost answer, shorter than a forgotten tab that would answer a new refund with an old one. */
+export const REFUND_KEY_KEPT_MS = 60 * 60_000;
+
+/** Where the keys are kept for the tab (a reload of the page, or a closed form, does not lose them); a browser that keeps nothing still has the memory of the page. */
+const TRIES_STORE = "sd.refund-tries";
+
+function triesOf(): Map<number, CollectAttempts> {
+  if (refundTries) return refundTries;
+
+  const tries = new Map<number, CollectAttempts>();
+
+  try {
+    const raw = typeof window === "undefined" ? null : window.sessionStorage.getItem(TRIES_STORE);
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+
+    if (parsed && typeof parsed === "object") {
+      for (const [id, value] of Object.entries(parsed as Record<string, { job?: unknown; keys?: unknown; at?: unknown }>)) {
+        const keys: Record<number, string> = {};
+
+        if (value && typeof value.keys === "object" && value.keys !== null) {
+          for (const [millimes, key] of Object.entries(value.keys as Record<string, unknown>)) {
+            if (typeof key === "string" && key !== "" && key.length <= 200 && Number.isSafeInteger(Number(millimes))) keys[Number(millimes)] = key;
+          }
+        }
+
+        if (Number.isSafeInteger(Number(id)) && typeof value?.job === "string" && typeof value.at === "number" && Object.keys(keys).length > 0) {
+          tries.set(Number(id), { job: value.job, keys });
+          refundStamps.set(Number(id), value.at);
+        }
+      }
+    }
+  } catch {
+    // Nothing kept, or nothing readable: start with no keys.
+  }
+
+  refundTries = tries;
+
+  return tries;
+}
+
+function keepTries(paymentId: number, attempts: CollectAttempts | null, now: number = Date.now()): void {
+  const tries = triesOf();
+
+  if (attempts) {
+    tries.set(paymentId, attempts);
+    refundStamps.set(paymentId, now);
+  } else {
+    tries.delete(paymentId);
+    refundStamps.delete(paymentId);
+  }
+
+  try {
+    const saved = Object.fromEntries([...tries].map(([id, kept]) => [id, { ...kept, at: refundStamps.get(id) ?? now }]));
+
+    if (typeof window !== "undefined") window.sessionStorage.setItem(TRIES_STORE, JSON.stringify(saved));
+  } catch {
+    // The memory of the page still has them.
+  }
+}
+
+/** The keys of a payment that are still good: older ones are dropped (a new refund of the same amount is then a new decision). */
+function triesFor(paymentId: number, now: number = Date.now()): CollectAttempts | null {
+  const kept = triesOf().get(paymentId) ?? null;
+  const at = refundStamps.get(paymentId);
+
+  if (kept && (at === undefined || now < at || now - at >= REFUND_KEY_KEPT_MS)) {
+    keepTries(paymentId, null);
+
+    return null;
+  }
+
+  return kept;
+}
+
+/**
+ * One refund of a payment, sent with the key of its amount: a repeated send of the same amount is answered again by the server, and
+ * nothing goes back twice. Returns the sentence to show, when there is one to show.
+ */
+async function sendRefund(paymentId: number, millimes: number, reason: string, card: boolean): Promise<string | undefined> {
+  const keyed = keyFor(triesFor(paymentId), paymentId, millimes, newRequestKey);
+
+  keepTries(paymentId, keyed.attempts);
+
+  const answer = await send(routes.finance.refundPayment<{ replayed?: boolean }>(paymentId, { amount: millimes / 1000, reason }, keyed.key));
+
+  // Answered: the next refund of this amount is a new one. The keys of other amounts that were sent and not answered are kept.
+  keepTries(paymentId, spendKey(keyed.attempts, millimes));
+
+  // The server had already made this refund (the same send, repeated): nothing went back a second time, and the screen says so
+  // instead of saying that money was given back.
+  if (answer?.replayed) return REFUND_REPLAYED_WORDS;
+
+  // A refund of a card payment is a record here: the money is still to be given back at the provider.
+  return card ? CARD_MONEY_WORDS.refunded : undefined;
+}
 
 /** The form behind each button of a payment row (P2-08). The call is the existing route of the payments; nothing is sent before the button of the form is pressed. */
 export function paymentSpec(action: PaymentAction, payment: PaymentRow): ActionSpec<unknown> {
@@ -69,13 +181,37 @@ export function paymentSpec(action: PaymentAction, payment: PaymentRow): ActionS
     };
   }
 
+  if (action === "check") {
+    return {
+      key: `check-${payment.id}`,
+      title,
+      // Asking again changes nothing by itself: the payment follows the provider's answer, whoever asks and however often.
+      retrySafe: true,
+      intro: (
+        <>
+          Demander au prestataire de paiement où en est le paiement de <strong>{amount}</strong> de {who(payment)}
+          {payment.providerReference ? ` (n° ${payment.providerReference} chez lui)` : ""}. Le paiement suit sa réponse : reçu, refusé, annulé, ou encore en attente. Rien n’est confirmé à la main.
+        </>
+      ),
+      fields: [],
+      submitLabel: "Vérifier maintenant",
+      check: () => ({ ok: true, value: null }),
+      run: async () => checkOutcomeWords(await send(routes.finance.checkPayment<{ status?: string }>(payment.id))),
+    };
+  }
+
   if (action === "refund") {
     return {
       key: `refund-${payment.id}`,
       title,
+      // One key goes with each amount that was sent: a try whose answer was lost, sent again, makes one refund.
+      retrySafe: true,
       intro: (
         <>
           Rendre de l’argent à {who(payment)} sur un paiement de <strong>{amount}</strong>. Il peut encore en revenir <strong>{moneyText(payment.refundable, payment.currency)}</strong>.
+          {!isManualMethod(payment.method) && (
+            <span className="mt-2 block rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">{CARD_MONEY_WORDS.refund}</span>
+          )}
         </>
       ),
       fields: [
@@ -91,9 +227,13 @@ export function paymentSpec(action: PaymentAction, payment: PaymentRow): ActionS
         if (!money.ok) return money;
         if (!why.ok) return why;
 
-        return { ok: true, value: { amount: money.millimes / 1000, reason: why.reason } };
+        return { ok: true, value: { amount: money.millimes / 1000, millimes: money.millimes, reason: why.reason } };
       },
-      run: async (body) => void (await send(routes.finance.refundPayment(payment.id, body as { amount: number; reason: string }))),
+      run: async (value) => {
+        const read = value as { amount: number; millimes: number; reason: string };
+
+        return sendRefund(payment.id, read.millimes, read.reason, !isManualMethod(payment.method));
+      },
     };
   }
 
@@ -107,6 +247,7 @@ export function paymentSpec(action: PaymentAction, payment: PaymentRow): ActionS
       <>
         {failing ? "Le paiement de" : "Annuler le paiement de"} <strong>{amount}</strong> {failing ? `de ${who(payment)} n’a pas abouti : il ne sera pas compté.` : `de ${who(payment)} : il ne sera pas compté.`}
         {payment.declared && ` L’artisan avait déclaré avoir encaissé ${moneyText(payment.declared.amount, payment.currency)} : cette déclaration sera retirée de son compte.`}
+        {isMoneyAtProvider(payment) && <span className="mt-2 block rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">{CARD_MONEY_WORDS.close}</span>}
       </>
     ),
     fields: [{ id: "reason", label: "Motif", kind: "textarea", required: true, maxLength: PAYMENT_REASON_MAX, help: "Gardé sur le paiement." }],
@@ -235,6 +376,8 @@ export function refundDueSpec(row: RefundDueRow): ActionSpec<unknown> {
   // What is given back is the larger of what the credit notes leave and what the accepted complaints leave: they are never added.
   const fromBoth = row.fromCreditNotes > 0 && row.fromComplaints > 0;
   // A credit note the invoice already covers is no reason for this refund: only what makes the job owe is named.
+  // A step on a card payment is recorded here only: the money is still to be given back at the provider.
+  const cards = steps.filter((step) => !isManualMethod(row.payments.find((payment) => payment.id === step.paymentId)?.method));
   const because = [numbers && row.fromCreditNotes > 0 ? `Avoir ${numbers}` : "", claims ? `Réclamation ${claims}` : ""].filter(Boolean).join(" · ");
 
   return {
@@ -266,6 +409,11 @@ export function refundDueSpec(row: RefundDueRow): ActionSpec<unknown> {
             ))}
           </ul>
         )}
+        {cards.length > 0 && (
+          <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+            {CARD_MONEY_WORDS.refund} {cards.length < steps.length ? `Concerné : ${cards.map((step) => `paiement n° ${step.paymentId}`).join(", ")}.` : ""}
+          </p>
+        )}
       </>
     ),
     fields: [{ id: "reason", label: "Motif", kind: "textarea", required: true, maxLength: PAYMENT_REASON_MAX, initial: because, help: "Gardé sur chaque paiement remboursé." }],
@@ -281,10 +429,16 @@ export function refundDueSpec(row: RefundDueRow): ActionSpec<unknown> {
     },
     run: async (reason) => {
       const made: string[] = [];
+      let replayed = false;
 
       for (const step of steps) {
         try {
-          await send(routes.finance.refundPayment(step.paymentId, { amount: step.millimes / 1000, reason: reason as string }));
+          // One key for each payment and amount, kept like the key of a single refund: a lost answer, sent again, is answered by the server.
+          const isCard = cards.includes(step);
+          const said = await sendRefund(step.paymentId, step.millimes, reason as string, isCard);
+
+          if (said === REFUND_REPLAYED_WORDS) replayed = true;
+
           made.push(`paiement n° ${step.paymentId} (${moneyText(step.millimes / 1000)})`);
         } catch (failure) {
           const before = made.length > 0 ? `Déjà remboursé : ${made.join(", ")}. ` : "";
@@ -297,6 +451,10 @@ export function refundDueSpec(row: RefundDueRow): ActionSpec<unknown> {
           throw new ActionFailure(made.length > 0 ? `${before}Le paiement n° ${step.paymentId} a été refusé : ${why} La liste est rechargée : elle ne propose plus que le reste.` : why);
         }
       }
+
+      if (replayed) return REFUND_REPLAYED_WORDS;
+
+      return cards.length > 0 ? CARD_MONEY_WORDS.refunded : undefined;
     },
   };
 }
