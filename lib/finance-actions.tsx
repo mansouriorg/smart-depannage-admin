@@ -12,6 +12,7 @@ import {
   checkOutcomeWords,
   keyFor,
   moneyText,
+  momentText,
   newRequestKey,
   paymentMethodLabel,
   readConfirmation,
@@ -373,12 +374,14 @@ export function refundDueSpec(row: RefundDueRow): ActionSpec<unknown> {
   const steps = refundPlan(row.due, row.payments);
   const numbers = row.creditNotes.map((note) => note.number).join(", ");
   const claims = row.complaints.map((complaint) => `n° ${complaint.id}`).join(", ");
-  // What is given back is the larger of what the credit notes leave and what the accepted complaints leave: they are never added.
-  const fromBoth = row.fromCreditNotes > 0 && row.fromComplaints > 0;
+  // What is given back is the largest of what the credit notes leave, what the accepted complaints leave and what a cancelled job
+  // holds: they are never added.
+  const reasons = [row.fromCreditNotes, row.fromComplaints, row.fromCancellation].filter((amount) => amount > 0).length;
+  const cancelledOn = row.cancelled?.at ? momentText(row.cancelled.at) : null;
   // A credit note the invoice already covers is no reason for this refund: only what makes the job owe is named.
   // A step on a card payment is recorded here only: the money is still to be given back at the provider.
   const cards = steps.filter((step) => !isManualMethod(row.payments.find((payment) => payment.id === step.paymentId)?.method));
-  const because = [numbers && row.fromCreditNotes > 0 ? `Avoir ${numbers}` : "", claims ? `Réclamation ${claims}` : ""].filter(Boolean).join(" · ");
+  const because = [numbers && row.fromCreditNotes > 0 ? `Avoir ${numbers}` : "", claims ? `Réclamation ${claims}` : "", row.fromCancellation > 0 ? "Mission annulée" : ""].filter(Boolean).join(" · ");
 
   return {
     key: `due-${row.interventionId}`,
@@ -395,8 +398,15 @@ export function refundDueSpec(row: RefundDueRow): ActionSpec<unknown> {
             {claims ? `Le remboursement accepté sur la réclamation ${claims}` : "Le remboursement accepté"} laisse <strong>{moneyText(row.fromComplaints)}</strong> à rendre à {row.client?.name ?? "le client"}.
           </p>
         ) : null}
-        {fromBoth ? (
-          <p className="mt-1 text-xs text-stone-500">Les deux ne s’additionnent pas : le même argent est rendu une seule fois, soit {moneyText(row.due)}.</p>
+        {row.fromCancellation > 0 ? (
+          <p className={row.fromCreditNotes > 0 || row.fromComplaints > 0 ? "mt-1" : undefined}>
+            La mission a été annulée{cancelledOn ? ` le ${cancelledOn}` : ""}
+            {row.cancelled?.reason ? ` (${row.cancelled.reason})` : ""}. {row.client?.name ?? "Le client"} a payé <strong>{moneyText(row.kept)}</strong>
+            {row.invoice && row.owed > 0 ? `, dont ${moneyText(row.owed)} sont demandés par la facture ${row.invoice.number}` : ""} : il en reste <strong>{moneyText(row.fromCancellation)}</strong> à rendre.
+          </p>
+        ) : null}
+        {reasons > 1 ? (
+          <p className="mt-1 text-xs text-stone-500">Ces montants ne s’additionnent pas : le même argent est rendu une seule fois, soit {moneyText(row.due)}.</p>
         ) : null}
         {steps.length === 0 ? (
           <p className="mt-2 font-medium text-red-700">Aucun paiement de cette mission ne peut plus être remboursé.</p>

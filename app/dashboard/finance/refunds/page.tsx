@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * The money to give back: the customer has paid more than the invoice now asks, after a credit note, or a refund accepted on one of
- * their complaints (P2-09) has not all gone back. This list does not depend on the period: a refund that is owed stays owed until it
+ * their complaints (P2-09) has not all gone back, or a cancelled job (P3-01) still holds what was paid. This list does not depend on the period: a refund that is owed stays owed until it
  * is made.
  */
 export default function FinanceRefundsPage() {
@@ -38,7 +38,7 @@ export default function FinanceRefundsPage() {
   return (
     <div className="space-y-4">
       <Notice>
-        Un avoir réduit ce que le client doit. S’il avait déjà payé plus, l’écart est à lui rendre. Un remboursement accepté sur une réclamation y figure aussi. Chaque ligne reste ici jusqu’à ce que le remboursement soit fait, quelle que soit la date de l’avoir ou de la décision.
+        Un avoir réduit ce que le client doit. S’il avait déjà payé plus, l’écart est à lui rendre. Un remboursement accepté sur une réclamation y figure aussi, ainsi qu’une mission annulée qui garde l’argent déjà payé. Chaque ligne reste ici jusqu’à ce que le remboursement soit fait, quelle que soit la date de l’avoir, de la décision ou de l’annulation.
       </Notice>
 
       {done && <Notice>{done}</Notice>}
@@ -54,7 +54,7 @@ export default function FinanceRefundsPage() {
           </div>
 
           {data.items.length === 0 ? (
-            <Empty>Aucun remboursement à faire : aucun client n’a payé plus que ce qui lui est demandé, et aucun remboursement accepté sur une réclamation n’attend.</Empty>
+            <Empty>Aucun remboursement à faire : aucun client n’a payé plus que ce qui lui est demandé, aucun remboursement accepté sur une réclamation n’attend, et aucune mission annulée ne garde d’argent.</Empty>
           ) : (
             <section className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
               <div className="overflow-x-auto">
@@ -78,7 +78,13 @@ export default function FinanceRefundsPage() {
                           <MissionLink id={row.interventionId} className="font-semibold text-blue-900 underline-offset-2 hover:underline">
                             n° {row.interventionId}
                           </MissionLink>
-                          {row.invoice ? <p className="text-xs text-stone-500">Facture {row.invoice.number}</p> : <p className="max-w-[200px] text-xs text-amber-800">Aucune facture en cours : vérifiez que la mission ne continue pas (nouvelle facture à venir) avant de rembourser.</p>}
+                          {row.invoice ? (
+                            <p className="text-xs text-stone-500">Facture {row.invoice.number}</p>
+                          ) : row.cancelled ? (
+                            <p className="max-w-[200px] text-xs text-stone-500">Mission annulée : aucune facture à venir.</p>
+                          ) : (
+                            <p className="max-w-[200px] text-xs text-amber-800">Aucune facture en cours : vérifiez que la mission ne continue pas (nouvelle facture à venir) avant de rembourser.</p>
+                          )}
                           {row.since && <p className="text-xs text-stone-500">Depuis le {momentText(row.since)}</p>}
                         </td>
                         <td className="px-4 py-3">
@@ -87,6 +93,13 @@ export default function FinanceRefundsPage() {
                         </td>
                         <td className="px-4 py-3 text-xs">
                           <ul className="space-y-0.5">
+                            {row.cancelled && row.fromCancellation > 0 ? (
+                              <li>
+                                <span className="font-semibold text-stone-700">Mission annulée</span> · {moneyText(row.fromCancellation)}
+                                {row.cancelled.at && <span className="block text-stone-500">le {momentText(row.cancelled.at)}</span>}
+                                {row.cancelled.reason && <span className="block max-w-[220px] text-stone-500">{row.cancelled.reason}</span>}
+                              </li>
+                            ) : null}
                             {row.creditNotes.map((note) => (
                               <li key={note.id}>
                                 Avoir <span className="font-semibold text-stone-700">{note.number}</span> · {moneyText(note.amount)}
