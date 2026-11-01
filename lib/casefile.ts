@@ -351,6 +351,17 @@ export function cancellationOf(file: Pick<CaseFile, "status" | "cancelledAt" | "
   };
 }
 
+/** The lines of the timeline that say a technician set out: after one of these there may be positions to read. */
+const ROUTE_LINE_TYPES = ["ARTISAN_ON_THE_WAY", "ARTISAN_ARRIVED", "WORK_STARTED", "WORK_COMPLETED"];
+
+/**
+ * Whether the route panel is offered (P3-05): a technician holds the job, or held it and set out (the timeline says so). A technician who
+ * set out and then gave the job back leaves no technician on the case, and a dispute about it still needs the route.
+ */
+export function jobHadATechnician(file: Pick<CaseFile, "artisan" | "timeline">): boolean {
+  return Boolean(file.artisan) || (file.timeline ?? []).some((line) => ROUTE_LINE_TYPES.includes(line.type));
+}
+
 /** The line under the title: the service, the trade. */
 export function serviceLine(file: Pick<CaseFile, "serviceType" | "subService">): string {
   const sub = clean(file.subService?.name);

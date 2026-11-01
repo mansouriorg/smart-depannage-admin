@@ -60,6 +60,9 @@ export interface ArtisanMatch {
   distanceKm: number | null;
   /** Null when the distance is unknown. */
   estimatedArrivalMinutes: number | null;
+  /** Whether the position the distance is measured from is up to date, silent for too long, or impossible to date (P3-05). */
+  locationState?: "fresh" | "stale" | "unknown";
+  locationAgeMinutes?: number | null;
   rating?: number | null;
   completedJobsCount?: number;
   activeJobsCount?: number;

@@ -23,6 +23,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ChoiceGroup } from "@/components/ui/choice-group";
 import { UrgencyBadge } from "@/components/tickets/urgency-badge";
+import { PositionBadge } from "@/components/technicians/position-badge";
 import { cn } from "@/lib/utils";
 
 interface AssignDialogProps {
@@ -274,6 +275,8 @@ export function AssignDialog({ job, onClose, onAssigned, onRefused, stale = fals
                                     <MapPin className="h-3 w-3" /> {distance}
                                   </span>
                                 )}
+                                {/* The distance is measured from the last position: when that is old, say so (P3-05). With no distance there is nothing measured from it. */}
+                                {distance ? <PositionBadge state={match.locationState} ageMinutes={match.locationAgeMinutes} quiet /> : null}
                                 {typeof match.rating === "number" && match.rating > 0 && (
                                   <span className="inline-flex items-center gap-1">
                                     <Star className="h-3 w-3" /> {match.rating.toFixed(1)}

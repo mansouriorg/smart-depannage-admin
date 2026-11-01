@@ -14,6 +14,7 @@ import {
   Loader2,
   MapPin,
   MessageSquare,
+  Route,
   Phone,
   RefreshCw,
   StickyNote,
@@ -38,6 +39,7 @@ import {
   normalizeCaseFile,
   preferredSlot,
   problemReport,
+  jobHadATechnician,
   serviceLine,
   splitShowable,
   withNote,
@@ -52,6 +54,7 @@ import { UrgencyBadge } from "@/components/tickets/urgency-badge";
 import { CaseTimeline } from "@/components/tickets/case-timeline";
 import { CaseMessages } from "@/components/tickets/case-messages";
 import { CaseNotes } from "@/components/tickets/case-notes";
+import { CaseRoute } from "@/components/tickets/case-route";
 
 /** A live event refreshes the page this long after the last one (several arrive together). */
 const LIVE_REFRESH_DELAY_MS = 800;
@@ -411,6 +414,14 @@ function CaseFilePage({ jobId }: { jobId: number | null }) {
 
           {/* Preuves de travail (P1-07): photos privées, contrôles du serveur, décision du back-office. */}
           <ProofsPanel ticket={shown} onTicketChanged={() => void load(true)} />
+
+          {/* Parcours du technicien (P3-05): pour un litige, lu à la demande. Seulement quand un technicien a eu cette demande :
+              celui qui l'a rendue (plus d'artisan sur la demande) a laissé sa trace dans l'historique, et son parcours reste lisible. */}
+          {jobHadATechnician(shown) ? (
+            <Section title="Parcours du technicien" icon={<Route className="h-5 w-5 text-[#D4AF37]" />}>
+              <CaseRoute jobId={shown.id} />
+            </Section>
+          ) : null}
         </div>
 
         {/* --- COLONNE DROITE --- */}

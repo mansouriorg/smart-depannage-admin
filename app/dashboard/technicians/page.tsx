@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
-import { callApi, pageItems, routes } from "@/lib/shared";
+import { callApi, clockText, pageItems, routes } from "@/lib/shared";
 import { 
   MapPin, 
   Star, 
@@ -20,7 +20,8 @@ import {
 import { InviteTechnicianModal } from "@/components/technicians/invite-technician-modal";
 import { PasswordLinkDialog } from "@/components/password-link-dialog";
 import { useStaff } from "@/components/auth/staff-provider";
-import { ratingLabel } from "@/lib/technicians";
+import { PositionBadge } from "@/components/technicians/position-badge";
+import { noPositionYet, positionIsExpected, ratingLabel } from "@/lib/technicians";
 
 interface Technician {
   id: number;
@@ -32,16 +33,27 @@ interface Technician {
   specialty?: string; 
   latitude?: number;
   longitude?: number;
+  // When the phone last said where it is, and whether that is too long ago (P3-05): GET /users/artisans carries the flag
+  locationState?: "fresh" | "stale" | "unknown";
+  locationAgeMinutes?: number | null;
   location?: string; 
   // The trade and the real rating of the profile (P1-12): GET /users/artisans carries them
-  artisanProfile?: { specialty?: string | null; averageRating?: number | null; ratingCount?: number | null } | null;
+  artisanProfile?: { specialty?: string | null; averageRating?: number | null; ratingCount?: number | null; availabilityStatus?: string | null } | null;
+  // A job on the way, arrived or at work: the phone sends its position for it whatever the switch says (P3-05)
+  hasJobUnderWay?: boolean;
   // What customers answered after the jobs of this artisan (the rating of the tracking link)
   feedback?: { average?: number | null; count?: number | null } | null;
 }
 
+/** How often the list is read again while the page is open and in front, and the least time between the start of two readings. */
+const REFRESH_EVERY_MS = 60_000;
+const REFRESH_MIN_GAP_MS = 30_000;
+
 // The list is read in pages of this size, all of them: with no search box, a technician beyond the first page could not be reached.
 const PAGE_SIZE = 200;
 const MAX_PAGES = 10;
+// A read that has not answered after this long is given up and said so: a connection that hangs (a laptop that slept) must not keep the "à jour" badges on the screen for ever.
+const READ_TIMEOUT_MS = 20_000;
 
 export default function TechniciansPage() {
   // A dispatcher or a support agent reads the list; inviting, switching off and sending a password link are for the administrators (the API refuses the others).
@@ -52,31 +64,85 @@ export default function TechniciansPage() {
   const [loading, setLoading] = useState(true);
   const [setupUrl, setSetupUrl] = useState<string | null>(null);
 
+  // The flag on a position is worked out by the server when the list is read: a page left open has to read again, or "up to date" would stay
+  // on the screen for hours after the phone went quiet (P3-05). `updatedAt` tells the dispatcher how old the screen is, and a reading that
+  // failed says so (the list on the screen is then the one of `updatedAt`).
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [readFailed, setReadFailed] = useState(false);
+  const [truncated, setTruncated] = useState(false);
+  const fetching = useRef(false);
+  // When the last reading began (a failed one counts: a server that is down is not asked more often because the person alt-tabs).
+  const lastAttempt = useRef(0);
+  // Bumped by every change made from this page (a deactivation, an invitation): a reading that began before it would bring back the rows as they
+  // were, so it is dropped and made again.
+  const changes = useRef(0);
+
   const fetchTechnicians = async () => {
+    if (fetching.current) return;
+
+    fetching.current = true;
+    lastAttempt.current = Date.now();
+
+    const startedAt = changes.current;
+    let again = false;
+
     try {
       // /users/artisans answers a page ({ data, meta }): a screen that reads another shape does not compile (P1-09)
-      const all: Technician[] = [];
+      // Kept by number: a technician invited while the pages are being read moves the others by one, and one would be seen twice.
+      const all = new Map<number, Technician>();
       let page = 1;
       let pages = 1;
 
       do {
-        const answer = await callApi((config) => api.request(config), routes.users.artisans<Technician>({ page, limit: PAGE_SIZE }));
+        const answer = await callApi((config) => api.request({ ...config, timeout: READ_TIMEOUT_MS }), routes.users.artisans<Technician>({ page, limit: PAGE_SIZE }));
 
-        all.push(...pageItems(answer));
+        for (const item of pageItems(answer)) all.set(item.id, item);
         pages = answer?.meta?.totalPages ?? 1;
         page += 1;
       } while (page <= pages && page <= MAX_PAGES);
 
-      setTechnicians(all);
+      if (changes.current !== startedAt) {
+        again = true;
+      } else {
+        setTechnicians([...all.values()]);
+        setTruncated(pages > MAX_PAGES);
+        setReadFailed(false);
+        setUpdatedAt(Date.now());
+      }
     } catch (err) {
       console.error("Failed to fetch technicians", err);
+      setReadFailed(true);
     } finally {
+      fetching.current = false;
       setLoading(false);
     }
+
+    if (again) void fetchTechnicians();
+  };
+
+  // Something was changed from this page: read the list again once the reading that may have begun before it is over.
+  const changed = () => {
+    changes.current += 1;
+    void fetchTechnicians();
   };
 
   useEffect(() => {
-    fetchTechnicians();
+    void fetchTechnicians();
+
+    // Every minute while the tab is in front, and when the person comes back to it; never more often than every thirty seconds.
+    const refreshIfDue = () => {
+      if (document.visibilityState === "visible" && Date.now() - lastAttempt.current >= REFRESH_MIN_GAP_MS) void fetchTechnicians();
+    };
+    const timer = setInterval(refreshIfDue, REFRESH_EVERY_MS);
+
+    document.addEventListener("visibilitychange", refreshIfDue);
+    window.addEventListener("focus", refreshIfDue);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshIfDue);
+      window.removeEventListener("focus", refreshIfDue);
+    };
   }, []);
 
   // New one-time "choose your password" link (the first one was lost or expired)
@@ -101,6 +167,7 @@ export default function TechniciansPage() {
       setTechnicians(prev => prev.map(tech => 
         tech.id === id ? { ...tech, isActive: false } : tech
       ));
+      changed();
     } catch (err) {
       alert("Erreur lors de la désactivation.");
     }
@@ -133,11 +200,20 @@ export default function TechniciansPage() {
           <p className="text-stone-500 mt-1">
             Gérez votre flotte d'experts ({technicians.filter(t => t.isActive).length} actifs).
           </p>
+          {updatedAt ? (
+            <p className="text-xs text-stone-400 mt-0.5">Liste mise à jour à {clockText(new Date(updatedAt).toISOString())}</p>
+          ) : null}
+          {readFailed && technicians.length > 0 ? (
+            <p className="text-xs text-red-600 mt-0.5">La mise à jour de la liste a échoué : ce qui est affiché peut ne plus être juste.</p>
+          ) : null}
+          {truncated ? (
+            <p className="text-xs text-amber-700 mt-0.5">Seuls les {MAX_PAGES * PAGE_SIZE} techniciens les plus récents sont affichés.</p>
+          ) : null}
         </div>
         
         {canInvite && (
           <div className="flex gap-3">
-            <InviteTechnicianModal onSuccess={fetchTechnicians} />
+            <InviteTechnicianModal onSuccess={changed} />
           </div>
         )}
       </div>
@@ -146,7 +222,7 @@ export default function TechniciansPage() {
       {technicians.length === 0 ? (
         <div className="text-center py-20 bg-stone-50 rounded-xl border border-stone-200 border-dashed">
           <Wrench className="h-10 w-10 text-stone-300 mx-auto mb-3" /> 
-          <p className="text-stone-400 text-sm">Aucun technicien pour le moment.</p>
+          <p className="text-stone-400 text-sm">{readFailed ? "Impossible de charger la liste des techniciens." : "Aucun technicien pour le moment."}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -221,6 +297,18 @@ export default function TechniciansPage() {
                       <span className="font-medium text-stone-400 italic">Non disponible</span>
                     )}
                   </div>
+
+                  {/* How old that position is: a technician whose phone has been silent is flagged (P3-05), but only one who is at work: an
+                      offline or deactivated technician sends nothing, and an amber flag on each of them hides the one who really went quiet. */}
+                  {tech.latitude && tech.longitude && positionIsExpected(tech) ? (
+                    <div className="flex justify-end">
+                      <PositionBadge state={tech.locationState} ageMinutes={tech.locationAgeMinutes} />
+                    </div>
+                  ) : noPositionYet(tech) ? (
+                    <div className="flex justify-end">
+                      <PositionBadge missing />
+                    </div>
+                  ) : null}
               </div>
 
               {/* FOOTER */}
